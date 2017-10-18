@@ -117,20 +117,7 @@ button{
 	outline: none;
 
 }
-button:hover{
-	transition-duration:0.2s;
-    box-shadow: 0 17px 50px 0 rgba(0,0,0,0.30);
-}
-button:active{
-    background-color: #c8e6f2;
-    color: #fff;
-}
-button a{
-	color: #0052ff;
-	font-family: 'Raleway', sans-serif;
-    font-weight: 400;
-    text-decoration:none; /*去掉下划线*/
-}
+
 
 .worktitle{
 	padding-top: 80px;
@@ -172,4 +159,19 @@ button a{
 .workpicline img:hover{
 	transform: scale(1.1);  
 	box-shadow: 0 17px 50px 0 rgba(0,0,0,0.30)；
+}
+.backtop{  
+	width: 30px;
+	height: 30px;
+    position: fixed;  
+    bottom:30px;  
+    right: 30px;    
+}  
+.backtop img{
+    width: 100%;
+}
+
+.backtop img:hover{
+	transition-duration:0.2s;
+    box-shadow: 0 10px 30px 0 rgba(0,0,0,0.20);
 }
