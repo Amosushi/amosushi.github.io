@@ -158,7 +158,8 @@ button a{
 	padding-right: 10%;
 	margin-bottom: 50px;
     width: 80%;
-    height: 600px;
+    height: auto;
+    position: absolute;
 }
 .workpicline img{
 	width: 25%;
