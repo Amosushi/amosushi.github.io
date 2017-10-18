@@ -24,10 +24,10 @@ body {
 .nav a {
 	margin: 0 20px 0 20px;
 	text-decoration:none; /*去掉下划线*/
-	color: #fff;
+	color: #000;
 }
 .nav a:visited{
-	color: #fff;
+	color: #000;
     
 }
 .nav a:hover{
