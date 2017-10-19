@@ -58,20 +58,9 @@ body {
   -o-background-size: cover;
   background-position: center 0;
 }
-.empty{
-	height:260px;
-}
-table{
-	height: 100%; width: 100%
-}
-#tt{
+.tt{
 	margin:0 auto;
-	position:absolute;
-    top: 50%;
-    left: 50%;
-    width: 52%;
-    margin:-100px 0 0 -150px
-    
+	padding-top: 50%;    
 }
 h1{
 	margin: 0px;
