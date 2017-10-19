@@ -12,29 +12,35 @@ body {
 }
 .logo{
 	float: left;
-	padding: 0 0 0 60px;
 }
 .nav {
 	float: right;
-	padding: 30px 50px 0 0;
+	width: 100%;
 	font-family: sans-serif;
     font-size: 18px;
 }
-
-.nav a {
+.logo a{
+	float: left;
+	margin: 0 0 0 30px;
+}
+.navspan{
+	padding-top: 20px;
+}
+.navspan a {
+	float: right;
 	margin: 0 20px 0 20px;
 	text-decoration:none; /*去掉下划线*/
 	color: #000;
 }
-.nav a:visited{
+.navspan a:visited{
 	color: #000;
     
 }
-.nav a:hover{
+.navspan a:hover{
 	transition-duration:0.2s;
 	color: #0052ff;
 	border-bottom: 2px solid #0052ff;
-	padding: 20px 0;
+	padding: 10px 0;
 }
 #web_bg{
   position:fixed;
