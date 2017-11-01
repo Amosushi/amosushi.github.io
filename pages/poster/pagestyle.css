@@ -1,0 +1,82 @@
+html {
+	padding: 0;
+	margin: 0;
+}
+body {
+	background-color: #fff;
+	height: 100%;
+	display: block;
+	background-position:center;
+	padding: 0;
+	margin: 0;
+}
+.backhome{
+	height: 30px;
+	padding: 20px;
+}
+.backhome a{
+	    font-size: 20px;
+    font-family: 'Raleway', sans-serif;
+    font-weight: 900;
+    text-decoration:none; /*去掉下划线*/
+    color: #000;
+}
+.backhome a:hover{
+	transition-duration:0.2s;
+    color: #0052ff;
+}
+.banner img{
+	width: 100%;
+	height:auto;
+}
+.content{
+	margin-bottom: 50px;
+	width: 50%;
+	min-width: 280px;
+	margin:0 auto;
+}
+H1{
+	padding-top: 40px;
+	padding-bottom: 40px;
+    font-size: 40px;
+    font-family: 'Raleway', sans-serif;
+    font-weight: 900;
+    color: #000;
+}
+
+H2{
+	font-size: 30px;
+    font-family: 'Raleway', sans-serif;
+    font-weight: 400;
+    color: #000;
+}
+
+p1{
+	line-height: 40px;
+	font-size: 1rem;
+    color: #3c3c3c;
+    font-weight: 200;
+}
+.pageimg{
+	text-align: center;
+}
+.pageimg img{
+	width: 100%;
+}
+
+.backtop{  
+	width: 30px;
+	height: 30px;
+    position: fixed;  
+    bottom:30px;  
+    right: 30px;    
+}  
+.backtop img{
+    width: 100%;
+}
+
+.backtop img:hover{
+	transform:scale(1.2);
+	transition-duration:0.2s;
+    box-shadow: 0 10px 30px 0 rgba(0,0,0,0.20);
+}
