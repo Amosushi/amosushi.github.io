@@ -128,7 +128,7 @@ button{
 .worktitle{
 	padding-top: 80px;
 	padding-left: 10%;
-	
+	padding-right: 10%;
 	font-family: 'Raleway', sans-serif;
     color: #000;
 }
@@ -141,7 +141,7 @@ button{
 }
 .worktitle p2{
 	margin-top: 10px;
-	font-weight: 400;
+	font-weight: 200;
 	width: 70%;
 	color: 000;
 }
