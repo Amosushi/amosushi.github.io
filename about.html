@@ -460,9 +460,11 @@
         }
 
         /* 桌面端：隐藏手机端新增的元素 */
-        .folder-icon,
-        .folder-label {
-            display: none;
+        @media (min-width: 768px) {
+            .folder-icon,
+            .folder-label {
+                display: none !important;
+            }
         }
 
     </style>
