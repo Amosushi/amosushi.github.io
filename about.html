@@ -382,16 +382,14 @@
         /* ============================================================
            手机端适配：隐藏大图，显示简洁导航
            ============================================================ */
+        /* ============================================================
+           手机端适配：隐藏大图，显示简洁导航
+           ============================================================ */
         @media (max-width: 767px) {
             /* 隐藏手电筒相关，但保留背景图 */
             .flashlight-mask,
             .light-toggle {
                 display: none !important;
-            }
-
-            /* 背景图保留，调整暗角 */
-            .desk-bg {
-                display: block;
             }
 
             /* 手机端使用简洁的链接列表 */
@@ -461,6 +459,12 @@
             }
         }
 
+        /* 桌面端：隐藏手机端新增的元素 */
+        .folder-icon,
+        .folder-label {
+            display: none;
+        }
+
     </style>
 </head>
 <body class="aboutpage">
@@ -490,7 +494,7 @@
             <div class="folder-img-wrap">
                 <img class="folder-img" src="me.png" alt="ME">
             </div>
-            <!-- 手机端图标 -->
+            <!-- 手机端图标 + 文字 -->
             <div class="folder-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -504,7 +508,7 @@
             <div class="folder-img-wrap">
                 <img class="folder-img" src="experience.png" alt="EXPERIENCE">
             </div>
-            <!-- 手机端图标 -->
+            <!-- 手机端图标 + 文字 -->
             <div class="folder-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
@@ -519,7 +523,7 @@
             <div class="folder-img-wrap">
                 <img class="folder-img" src="contact.png" alt="CONTACT">
             </div>
-            <!-- 手机端图标 -->
+            <!-- 手机端图标 + 文字 -->
             <div class="folder-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
