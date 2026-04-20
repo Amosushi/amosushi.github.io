@@ -272,25 +272,10 @@
     const loadingScreen = document.getElementById('loading-screen');
     const percentEl = document.getElementById('loading-percent');
 
-    // 需要预加载的资源（首页 + Works + AboutMe）
+    // 只预加载首页必须资源（其他页面资源在跳转时再加载）
     const resources = [
-        // 首页
-        'bg.mp4',
+        // 首页必须
         'Logo.png',
-        // Works 页面
-        'WorksBG.png',
-        'icons/qts.png',
-        'icons/dingtalk.png',
-        'icons/blink.png',
-        'icons/aidesign.png',
-        'icons/leadership.png',
-        'icons/thisweb.png',
-        // AboutMe 页面
-        'AboutMeBG.png',
-        'me.png',
-        'experience.png',
-        'contact.png',
-        // 字体 + 音频
         'Flynnmono.ttf',
         'keyboardSound.mp3'
     ];
@@ -299,23 +284,28 @@
     const total = resources.length + 1; // +1 是视频
     let finished = false;
 
-    // 更新进度百分比
+    function finishLoading() {
+        if (finished) return;
+        finished = true;
+        percentEl.textContent = '100%...';
+        setTimeout(() => {
+            loadingScreen.classList.add('fade-out');
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 600);
+        }, 200);
+    }
+
     function updateProgress() {
         if (finished) return;
         loaded++;
         const pct = Math.round((loaded / total) * 100);
         percentEl.textContent = pct + '%...';
-
-        if (loaded >= total) {
-            finished = true;
-            setTimeout(() => {
-                loadingScreen.classList.add('fade-out');
-                setTimeout(() => {
-                    loadingScreen.style.display = 'none';
-                }, 600);
-            }, 200);
-        }
+        if (loaded >= total) finishLoading();
     }
+
+    // 超时保护：最多等 6 秒，不管加载完没完都进入页面
+    setTimeout(finishLoading, 6000);
 
     // 图片预加载
     resources.forEach(src => {
@@ -331,19 +321,21 @@
             audio.preload = 'auto';
             audio.src = src;
         } else if (src.endsWith('.ttf') || src.endsWith('.woff') || src.endsWith('.woff2')) {
-            // 字体延迟检测
             setTimeout(updateProgress, 500);
         }
     });
 
-    // 视频预加载
+    // 视频预加载 — 兼容 Safari/移动端
     const video = document.querySelector('.bg-video');
     if (video) {
+        // Safari/移动端：canplay 可能不触发，加多重保护
         video.oncanplay = updateProgress;
         video.onerror = updateProgress;
+        video.onloadeddata = updateProgress;  // 额外监听 loadeddata
         video.load();
+        // 如果视频已经有足够数据（缓存），直接触发
+        if (video.readyState >= 3) updateProgress();
     } else {
-        // 如果没有视频元素，直接标记完成
         updateProgress();
     }
 
