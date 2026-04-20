@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AboutMe — Jiho Design</title>
+    <link rel="icon" href="favicon.png" type="image/png">
+
+    <!-- Import maps（鼠标效果依赖） -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.js"
+            }
+        }
+    </script>
+
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ============================================================
+           About 页面专属样式
+           ============================================================ */
+
+        body.aboutpage {
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+
+        /* 桌面背景 */
+        .desk-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background: url('AboutMeBG.png') center center / cover no-repeat;
+        }
+
+        /* 桌面纹理叠加（保留轻微暗角） */
+        .desk-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.18) 100%);
+        }
+
+        /* ============================================================
+           桌面内容区
+           ============================================================ */
+        .desk-content {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            padding-top: 80px;
+        }
+
+        /* ============================================================
+           图片入口组件
+           ============================================================ */
+        .folder-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            /* 入场初始状态：隐藏 + 上浮 */
+            opacity: 0;
+            transform: translateY(40px) scale(0.94);
+        }
+
+        /* 入场动画：弹性弹出 */
+        @keyframes folderPop {
+            0%   { opacity: 0; transform: translateY(40px) scale(0.94); }
+            65%  { opacity: 1; transform: translateY(-6px) scale(1.02); }
+            85%  { opacity: 1; transform: translateY(3px) scale(0.99); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* 入场顺序：2 -> 1 -> 3，间隔 120ms */
+        .folder-item:nth-child(2) { animation: folderPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.10s forwards; }
+        .folder-item:nth-child(1) { animation: folderPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.22s forwards; }
+        .folder-item:nth-child(3) { animation: folderPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.34s forwards; }
+
+        /* 图片容器 — 控制尺寸并承载阴影 */
+        .folder-img-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* 图片本体 */
+        .folder-img {
+            display: block;
+            max-height: 420px;
+            width: auto;
+            /* 底部静态阴影 — 用伪元素做，投射到 wrap 底部外侧 */
+            filter: drop-shadow(0 18px 28px rgba(0,0,0,0.55));
+            transition: filter 0.28s ease;
+        }
+
+        /* Hover：图片放大，阴影扩散，3D 倾斜（由 JS 动态控制 rotateX/Y） */
+        .folder-item:hover .folder-img-wrap {
+            transform: scale(1.06) translateY(-6px);
+            transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .folder-item .folder-img-wrap {
+            transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .folder-item:hover .folder-img {
+            filter: drop-shadow(0 28px 42px rgba(0,0,0,0.65))
+                    drop-shadow(0 0 18px rgba(255,255,255,0.12));
+        }
+
+        /* 三张图片之间的分隔：靠得很近，中间留细缝 */
+        .folder-item + .folder-item .folder-img-wrap {
+            margin-left: -1px;
+        }
+
+        /* ============================================================
+           纸张展开层（Paper Sheet）— 3D 挤出版
+           ============================================================ */
+
+        /* 透视容器，套在 body 上 */
+        .paper-perspective {
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            perspective: 1200px;
+            pointer-events: none;
+        }
+
+        .paper-overlay {
+            position: absolute;
+            border-radius: 10px;
+            /* 恢复暖色纸质感 */
+            background-color: #f5ede0;
+            background-image:
+                radial-gradient(ellipse at 18% 8%,  rgba(255,255,245,0.7) 0%, transparent 55%),
+                radial-gradient(ellipse at 82% 92%, rgba(200,155,90,0.18) 0%, transparent 50%),
+                repeating-linear-gradient(
+                    0deg,
+                    transparent 0px,
+                    transparent 27px,
+                    rgba(160,120,70,0.07) 27px,
+                    rgba(160,120,70,0.07) 28px
+                );
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+            transform-origin: 50% 100%;
+            will-change: transform, opacity;
+            box-shadow:
+                0 8px 40px rgba(0,0,0,0.18),
+                0 2px 8px  rgba(0,0,0,0.10);
+        }
+
+        /* 纸张内容区 */
+        .paper-content {
+            position: absolute;
+            inset: 0;
+            overflow-y: auto;
+            padding: 72px 64px 48px;
+            opacity: 0;
+        }
+
+        .paper-overlay.open .paper-content {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ============================================================
+           开灯按钮 — 右下角常驻，z-index 高于手电筒层
+           ============================================================ */
+        .light-toggle {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            z-index: 220;
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            /* 默认：白色高不透明度，醒目 */
+            background: rgba(255, 255, 255, 0.90);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+            transition: background 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+        }
+
+        body.paper-open .light-toggle {
+            display: flex;
+        }
+
+        .light-toggle:hover {
+            transform: scale(1.08);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.30);
+        }
+
+        /* 开灯状态：橙色底 */
+        body.light-on .light-toggle {
+            background: #FF8521;
+            box-shadow: 0 2px 16px rgba(255, 133, 33, 0.55);
+        }
+
+        /* 默认：图标黑色 */
+        .light-toggle svg {
+            width: 18px;
+            height: 18px;
+            color: #111;
+            transition: color 0.3s ease;
+        }
+
+        /* 开灯：图标纯白 */
+        body.light-on .light-toggle svg {
+            color: #ffffff;
+        }
+
+        /* 开灯时遮罩淡出 */
+        body.light-on .flashlight-mask {
+            opacity: 0 !important;
+            transition: opacity 0.5s ease;
+        }
+
+        /* 关闭按钮在手电筒层之上，始终可点击 */
+        .paper-close {
+            position: absolute;
+            top: 64px;   /* 避开顶部导航栏 */
+            right: 24px;
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: rgba(0,0,0,0.15);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease;
+            z-index: 210;  /* 高于手电筒层 205 */
+        }
+
+        .paper-close:hover {
+            background: rgba(0,0,0,0.25);
+        }
+
+        .paper-close svg {
+            width: 16px;
+            height: 16px;
+            color: rgba(60,40,20,0.6);
+        }
+
+        /* 纸张内容 typography */
+        .paper-title {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 28px;
+            color: #1a1005;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+
+        .paper-subtitle {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 11px;
+            color: #1a1005;
+            letter-spacing: 2px;
+            margin-bottom: 40px;
+            opacity: 0.55;
+        }
+
+        .paper-body {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 13px;
+            color: #1a1005;
+            line-height: 2;
+            letter-spacing: 0.5px;
+            opacity: 0.85;
+        }
+
+        /* ============================================================
+           导航栏 — 纸张打开时变为极暗色，但始终可见（z-index 高于手电筒）
+           ============================================================ */
+
+        /* 导航栏过渡 */
+        .navbar {
+            transition:
+                background 0.4s ease,
+                border-color 0.4s ease !important;
+        }
+
+        .nav-links a,
+        .logo-img {
+            transition:
+                color 0.4s ease,
+                filter 0.4s ease !important;
+        }
+
+        /* 纸张展开时，导航栏浮在手电筒层之上，但颜色暗下去 */
+        .aboutpage .navbar {
+            z-index: 300;
+        }
+
+        body.paper-open .navbar {
+            z-index: 220 !important;  /* 高于手电筒层 205，导航始终可见 */
+            background: rgba(0, 0, 0, 0.0) !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            border-bottom-color: transparent !important;
+        }
+
+        /* 导航链接暗化为 #252525 */
+        body.paper-open .nav-links a {
+            color: #252525 !important;
+        }
+
+        body.paper-open .nav-links a::after {
+            background: #252525 !important;
+        }
+
+        body.paper-open .nav-links a:hover {
+            color: #353535 !important;
+        }
+
+        /* Logo 暗化 */
+        body.paper-open .logo-img {
+            filter: brightness(0) opacity(0.15) !important;
+        }
+
+        /* ============================================================
+           手电筒遮罩层 — 纯黑，光圈透出下方暖色纸张
+           ============================================================ */
+        .flashlight-mask {
+            position: fixed;
+            inset: 0;
+            z-index: 205;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+            background: #000;
+        }
+
+        body.paper-open .flashlight-mask {
+            opacity: 1;
+        }
+
+        /* ============================================================
+           About 页面导航栏默认样式（白字，透明背景）
+           ============================================================ */
+        .aboutpage .navbar {
+            background: transparent;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            border-bottom-color: transparent;
+        }
+
+        .aboutpage .nav-links a {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .aboutpage .nav-links a::after {
+            background: #fff;
+        }
+
+        .aboutpage .nav-links a:hover {
+            color: #fff;
+        }
+
+        .aboutpage .logo-img {
+            filter: none;
+        }
+
+    </style>
+</head>
+<body class="aboutpage">
+
+    <!-- 桌面背景 -->
+    <div class="desk-bg"></div>
+
+    <!-- 鼠标效果所需 DOM（复用首页） -->
+    <div id="loading" style="display:none;"></div>
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- 导航栏（复用 style.css 的 .navbar） -->
+    <nav class="navbar">
+        <a href="index.html" class="nav-logo">
+            <img src="Logo.png" alt="Logo" class="logo-img">
+        </a>
+        <ul class="nav-links">
+            <li><a href="works.html">Works</a></li>
+            <li><a href="about.html" class="nav-active">AboutMe</a></li>
+        </ul>
+    </nav>
+
+    <!-- 桌面内容区：3个图片入口 -->
+    <div class="desk-content">
+
+        <div class="folder-item" data-folder="me">
+            <div class="folder-img-wrap">
+                <img class="folder-img" src="me.png" alt="ME">
+            </div>
+        </div>
+
+        <div class="folder-item" data-folder="works">
+            <div class="folder-img-wrap">
+                <img class="folder-img" src="experience.png" alt="EXPERIENCE">
+            </div>
+        </div>
+
+        <div class="folder-item" data-folder="contact">
+            <div class="folder-img-wrap">
+                <img class="folder-img" src="contact.png" alt="CONTACT">
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 纸张展开层：perspective 容器 + overlay -->
+    <div class="paper-perspective" id="paper-perspective">
+        <div class="paper-overlay" id="paper-overlay">
+            <button class="paper-close" id="paper-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+            <div class="paper-content" id="paper-content">
+                <!-- 内容由 JS 填入 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 手电筒遮罩 -->
+    <div class="flashlight-mask" id="flashlight-mask"></div>
+
+    <!-- 开灯按钮（右下角常驻） -->
+    <button class="light-toggle" id="light-toggle" title="开灯 / 关灯">
+        <!-- 灯泡图标 -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 14c.2-1 .7-1.7 1.5-2.5C17.7 10.3 18 9.2 18 8A6 6 0 0 0 6 8c0 1.2.3 2.3 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/>
+            <path d="M9 18h6"/>
+            <path d="M10 21h4"/>
+        </svg>
+    </button>
+
+    <!-- 过渡 overlay（复用首页动画） -->
+    <div id="transition-overlay"></div>
+
+    <script>
+        // ============================================================
+        // 各文件夹的纸张内容
+        // ============================================================
+        const FOLDER_DATA = {
+            me: {
+                title: 'JIHO',
+                subtitle: 'DESIGNER / 设计师',
+                body: `Hi, 我是 Jiho。\n\n一个热爱细节的产品设计师，\n做过从 0 到 1 的大型系统，也打磨过像素级的微交互。\n\n擅长把复杂的东西变得清晰，\n把无聊的东西做得有点意思。`,
+            },
+            works: {
+                title: 'EXPERIENCE',
+                subtitle: '工作经历 / TIMELINE',
+                body: `QTS — 2019 至今\n量化交易平台，主设计师\n\nDingtalk — 2017 ~ 2019\n钉钉工作台，体验设计\n\nBlink — 探索项目\n概念级产品设计\n\nAI Design — 进行中\n人工智能辅助设计工具链`,
+            },
+            contact: {
+                title: 'CONTACT',
+                subtitle: '联系方式 / GET IN TOUCH',
+                body: `Mail: hello@jiho.design\n\nWeChat: jiho_design\n\nBehance: behance.net/jiho\n\n如果你有个有趣的项目，\n欢迎联系我聊聊。`,
+            },
+        };
+
+        // ============================================================
+        // 手电筒效果
+        // ============================================================
+        const flashMask = document.getElementById('flashlight-mask');
+        const LIGHT_R = 280; // 光圈半径 px（更大）
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let curX = mouseX, curY = mouseY;
+        let rafId = null;
+
+        function updateFlashlight() {
+            curX += (mouseX - curX) * 0.12;
+            curY += (mouseY - curY) * 0.12;
+            // 光圈中心完全透明，边缘更柔和地过渡到纯黑
+            flashMask.style.background = `radial-gradient(
+                circle ${LIGHT_R}px at ${curX}px ${curY}px,
+                transparent         0%,
+                transparent         28%,
+                rgba(0, 0, 0, 0.30) 50%,
+                rgba(0, 0, 0, 0.75) 72%,
+                rgba(0, 0, 0, 0.95) 88%,
+                #000               100%
+            )`;
+            rafId = requestAnimationFrame(updateFlashlight);
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // ============================================================
+        // 开灯按钮
+        // ============================================================
+        const lightToggle = document.getElementById('light-toggle');
+        let lightOn = false;
+
+        lightToggle.addEventListener('click', () => {
+            lightOn = !lightOn;
+            if (lightOn) {
+                document.body.classList.add('light-on');
+                // 停止手电筒 rAF，省性能
+                if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+            } else {
+                document.body.classList.remove('light-on');
+                // 重启手电筒
+                curX = mouseX; curY = mouseY;
+                if (!rafId) updateFlashlight();
+            }
+        });
+
+        // ============================================================
+        // 纸张 3D 挤出动画
+        // ============================================================
+        const perspective = document.getElementById('paper-perspective');
+        const overlay     = document.getElementById('paper-overlay');
+        const content     = document.getElementById('paper-content');
+        const closeBtn    = document.getElementById('paper-close');
+        let isOpen = false;
+        let openAnim = null;
+
+        // 弹性 easing（仿 Mac Dock）：超出后回弹
+        // cubic-bezier 无法做 overshoot，改用 Web Animations API keyframes
+        function openPaper(folderEl, id) {
+            if (isOpen) return;
+            isOpen = true;
+
+            const data = FOLDER_DATA[id];
+            if (!data) return;
+
+            // 填入内容
+            content.style.opacity   = '0';
+            content.style.transform = 'translateY(16px)';
+            content.innerHTML = `
+                <div class="paper-title">${data.title}</div>
+                <div class="paper-subtitle">${data.subtitle}</div>
+                <div class="paper-body">${data.body.replace(/\n/g, '<br>')}</div>
+            `;
+
+            // 获取文件夹图标的位置
+            const folderRect = folderEl.querySelector('.folder-img-wrap').getBoundingClientRect();
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+
+            // 起点：文件夹图标的位置 & 尺寸
+            const startTop    = folderRect.top;
+            const startLeft   = folderRect.left;
+            const startW      = folderRect.width;
+            const startH      = folderRect.height;
+
+            // 终点：全屏
+            const endTop  = 0, endLeft  = 0, endW = vw, endH = vh;
+
+            // 设置初始状态（不可见，定位在文件夹处）
+            Object.assign(overlay.style, {
+                top:           startTop  + 'px',
+                left:          startLeft + 'px',
+                width:         startW    + 'px',
+                height:        startH    + 'px',
+                borderRadius:  '10px',
+                opacity:       '1',
+                pointerEvents: 'auto',
+                transform:     'rotateX(40deg) scaleX(0.6)',
+                transformOrigin: '50% 100%',
+            });
+            perspective.style.pointerEvents = 'auto';
+
+            // 强制 reflow
+            overlay.getBoundingClientRect();
+
+            // ── Web Animations API：3D 挤出关键帧 ──────────────────
+            // 模拟从文件夹夹缝里「挤出」再弹开铺满屏幕
+            const keyframes = [
+                // 0% 起点：小尺寸，向后倾斜，窄
+                {
+                    top: startTop + 'px', left: startLeft + 'px',
+                    width: startW + 'px', height: startH + 'px',
+                    borderRadius: '10px',
+                    transform: 'rotateX(38deg) scaleX(0.55)',
+                    opacity: 1,
+                    offset: 0
+                },
+                // 15%：开始向上「挤出」，宽度先窄后扩
+                {
+                    top: (startTop - startH * 0.5) + 'px',
+                    left: (startLeft - startW * 0.1) + 'px',
+                    width: (startW * 1.1) + 'px',
+                    height: (startH * 1.8) + 'px',
+                    borderRadius: '8px',
+                    transform: 'rotateX(22deg) scaleX(0.75)',
+                    opacity: 1,
+                    offset: 0.15
+                },
+                // 40%：纸张已经大半出来，透视角减小
+                {
+                    top: (vh * 0.15) + 'px',
+                    left: (vw * 0.08) + 'px',
+                    width: (vw * 0.84) + 'px',
+                    height: (vh * 0.7) + 'px',
+                    borderRadius: '6px',
+                    transform: 'rotateX(8deg) scaleX(1.0)',
+                    opacity: 1,
+                    offset: 0.40
+                },
+                // 65%：超出目标尺寸一点（overshoot，Dock 效果核心）
+                {
+                    top:    (-vh * 0.015) + 'px',
+                    left:   (-vw * 0.01)  + 'px',
+                    width:  (vw * 1.02)   + 'px',
+                    height: (vh * 1.03)   + 'px',
+                    borderRadius: '2px',
+                    transform: 'rotateX(-2deg) scaleX(1.01)',
+                    opacity: 1,
+                    offset: 0.65
+                },
+                // 85%：回弹，略小于全屏
+                {
+                    top:    (vh * 0.005) + 'px',
+                    left:   (vw * 0.003) + 'px',
+                    width:  (vw * 0.994) + 'px',
+                    height: (vh * 0.993) + 'px',
+                    borderRadius: '1px',
+                    transform: 'rotateX(0.5deg) scaleX(1.0)',
+                    opacity: 1,
+                    offset: 0.85
+                },
+                // 100%：正好铺满
+                {
+                    top: '0px', left: '0px',
+                    width: vw + 'px', height: vh + 'px',
+                    borderRadius: '0px',
+                    transform: 'rotateX(0deg) scaleX(1)',
+                    opacity: 1,
+                    offset: 1
+                }
+            ];
+
+            openAnim = overlay.animate(keyframes, {
+                duration: 680,
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                fill: 'forwards'
+            });
+
+            // 动画结束：固定最终样式，导航变色，启动手电筒，淡入内容
+            openAnim.onfinish = () => {
+                Object.assign(overlay.style, {
+                    top: '0px', left: '0px',
+                    width: vw + 'px', height: vh + 'px',
+                    borderRadius: '0px',
+                    transform: 'none',
+                    transformOrigin: '50% 50%'
+                });
+                document.body.classList.add('paper-open');
+
+                // 启动手电筒（仅在未开灯时）
+                curX = mouseX; curY = mouseY;
+                if (!lightOn && !rafId) updateFlashlight();
+
+                // 内容淡入
+                content.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+                content.style.opacity    = '1';
+                content.style.transform  = 'translateY(0)';
+            };
+        }
+
+        function closePaper() {
+            if (!isOpen) return;
+            isOpen = false;
+
+            // 停掉未完成的开场动画
+            if (openAnim) { openAnim.cancel(); openAnim = null; }
+
+            // 停手电筒
+            if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+
+            // 重置开灯状态
+            lightOn = false;
+            document.body.classList.remove('light-on');
+
+            // 内容先淡出
+            content.style.transition = 'opacity 0.12s ease';
+            content.style.opacity    = '0';
+            document.body.classList.remove('paper-open');
+
+            // 给 overlay 当前最终状态作为起点
+            const vw = window.innerWidth, vh = window.innerHeight;
+
+            setTimeout(() => {
+                const closeAnim = overlay.animate([
+                    {
+                        top: '0px', left: '0px',
+                        width: vw + 'px', height: vh + 'px',
+                        borderRadius: '0px',
+                        transform: 'rotateX(0deg) scaleX(1)',
+                        opacity: 1,
+                        transformOrigin: '50% 50%',
+                        offset: 0
+                    },
+                    {
+                        top: (vh * 0.25) + 'px', left: (vw * 0.35) + 'px',
+                        width: (vw * 0.3) + 'px', height: (vh * 0.25) + 'px',
+                        borderRadius: '8px',
+                        transform: 'rotateX(20deg) scaleX(0.8)',
+                        opacity: 0.6,
+                        transformOrigin: '50% 100%',
+                        offset: 0.5
+                    },
+                    {
+                        top: (vh * 0.45) + 'px', left: (vw * 0.46) + 'px',
+                        width: (vw * 0.08) + 'px', height: (vh * 0.08) + 'px',
+                        borderRadius: '10px',
+                        transform: 'rotateX(45deg) scaleX(0.4)',
+                        opacity: 0,
+                        transformOrigin: '50% 100%',
+                        offset: 1
+                    }
+                ], {
+                    duration: 350,
+                    easing: 'cubic-bezier(0.4, 0, 0.8, 0.8)',
+                    fill: 'forwards'
+                });
+
+                closeAnim.onfinish = () => {
+                    Object.assign(overlay.style, {
+                        opacity: '0',
+                        pointerEvents: 'none',
+                        top: '50vh', left: '50vw',
+                        width: '0px', height: '0px',
+                        transform: 'none'
+                    });
+                    perspective.style.pointerEvents = 'none';
+                };
+            }, 120);
+        }
+
+        // 绑定文件夹单击
+        document.querySelectorAll('.folder-item').forEach(item => {
+            item.addEventListener('click', () => {
+                openPaper(item, item.dataset.folder);
+            });
+        });
+
+        // ============================================================
+        // 3D 倾斜效果（鼠标追踪）
+        // ============================================================
+        const TILT_MAX = 15; // 最大倾斜角度（度）
+
+        document.querySelectorAll('.folder-item').forEach(item => {
+            const wrap = item.querySelector('.folder-img-wrap');
+
+            item.addEventListener('mousemove', (e) => {
+                const rect = item.getBoundingClientRect();
+                // 鼠标相对于元素中心的偏移（归一化 -1 ~ 1）
+                const cx = (e.clientX - rect.left) / rect.width  - 0.5;  // -0.5 ~ 0.5
+                const cy = (e.clientY - rect.top)  / rect.height - 0.5;  // -0.5 ~ 0.5
+
+                // rotateY：左右偏，rotateX：上下俯仰（取反让鼠标方向更直觉）
+                const rotateY =  cx * TILT_MAX * 2;
+                const rotateX = -cy * TILT_MAX * 2;
+
+                wrap.style.transform =
+                    `scale(1.06) translateY(-6px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+
+            // 鼠标离开，恢复原位
+            item.addEventListener('mouseleave', () => {
+                wrap.style.transform = '';
+            });
+        });
+
+        // 关闭按钮
+        closeBtn.addEventListener('click', closePaper);
+
+        // ============================================================
+        // 导航栏过渡动画（Works 页跳转）
+        // ============================================================
+        (function () {
+            const CX = '56.6%';
+            const CY = '39.0%';
+            const START_R = '3px';
+
+            const worksLink = document.querySelector('a[href="works.html"]');
+            if (!worksLink) return;
+
+            worksLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetHref = this.href;
+                const overlay2 = document.getElementById('transition-overlay');
+                if (!overlay2) return;
+
+                const maxR = Math.max(window.innerWidth, window.innerHeight) * 1.6;
+                overlay2.style.cssText = `
+                    position:fixed; top:0; left:0;
+                    width:100vw; height:100vh;
+                    background:#000;
+                    z-index:999;
+                    clip-path: circle(${START_R} at ${CX} ${CY});
+                `;
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        overlay2.style.transition = 'clip-path 0.35s cubic-bezier(0.4,0,0.2,1)';
+                        overlay2.style.clipPath = `circle(${maxR}px at ${CX} ${CY})`;
+                    });
+                });
+
+                setTimeout(() => { window.location.href = targetHref; }, 350);
+            });
+        })();
+    </script>
+    <!-- 鼠标效果 JS（ES Module，仅桌面端，复用首页） -->
+    <script type="module">
+        const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768;
+        if (!isMobile) {
+            const s = document.createElement('script');
+            s.type = 'module';
+            s.src = 'mouse-effect.js';
+            document.body.appendChild(s);
+        }
+    </script>
+
+</body>
+</html>

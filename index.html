@@ -1,55 +1,259 @@
 <!DOCTYPE html>
-<html>
-<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
-<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
- <head>
- 	<title>
- 		AmosKim Design
- 	</title>
-    <link rel="stylesheet" type="text/css" href="styles.css"/>
-    <link rel="stylesheet" type="text/css" href="bootstrap.css"/>
-    <link href="/img/favicon.ico" rel="shortcut icon" />
-    <!-- 引入这些文件至 <head> 中 -->
-<link rel="stylesheet" href="responsive-nav.css">
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I'm a Designer</title>
+    <link rel="icon" href="favicon.png" type="image/png">
 
-<body>
+    <!-- Import maps polyfill (鼠标效果用) -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.js"
+            }
+        }
+    </script>
 
-<nav class="navbar navbar-light bg-light">
-  <a class="navbar-brand" href="javascript:location.reload();">
-    <img src="img/a_logo.png" width="50" height="50" class="d-inline-block align-top" alt="">
-  </a>
-  <div class="navbarright">
-  <ul class="nav nav-pills">
-    <li class="nav-item">
-      <a class="nav-link active" href="javascript:location.reload();">Home</a>
-    </li>
-    <li class="nav-item">
-    <a class="nav-link" href="works.html">Work</a>
-    </li>
-     <li class="nav-item">
-    <a class="nav-link" href="resource.html">Resource</a>
-    </li>
-  </ul>
-  </div>
-</nav>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="homepage">
 
+    <!-- ========== 背景视频 ========== -->
+    <video class="bg-video" autoplay muted loop playsinline>
+        <source src="bg.mp4" type="video/mp4">
+    </video>
 
-<div class="hometitle">
- <div class="tt">
-  <maintitle>I’m a Designer</maintitle>
-  <p>UI / UX / Graphic Design</p>
-  <div class="mb">
-    <button class="button1">
-      <a href="mailto:amoskim@foxmail.com">Contact Me</a>
+    <!-- ========== 导航栏 ========== -->
+    <nav class="navbar">
+        <a href="index.html" class="nav-logo">
+            <img src="Logo.png" alt="Logo" class="logo-img">
+        </a>
+        <ul class="nav-links">
+            <li><a href="works.html" id="nav-works">Works</a></li>
+            <li><a href="about.html">AboutMe</a></li>
+        </ul>
+    </nav>
+
+    <!-- 圆形过渡动画层 -->
+    <div id="transition-overlay"></div>
+
+    <!-- ========== 背景音乐 ========== -->
+    <audio id="bg-music" src="keyboardSound.mp3" loop preload="auto"></audio>
+
+    <!-- 静音切换按钮 -->
+    <button id="mute-btn" class="mute-btn" title="Toggle sound">
+        <svg id="icon-sound" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+        <svg id="icon-mute" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <line x1="23" y1="9" x2="17" y2="15"/>
+            <line x1="17" y1="9" x2="23" y2="15"/>
+        </svg>
     </button>
-  </div>
- </div>
-</div>
 
+    <!-- ========== 鼠标效果相关 DOM ========== -->
+    <div id="loading" style="display:none;"></div>
+    <!-- WebGL Canvas（鼠标效果渲染层） -->
+    <canvas id="webgl-canvas"></canvas>
 
-<div id="web_bg" style="background-image: url(img/back.jpg);"> </div>
+    <!-- ========== 主标题 ========== -->
+    <div class="hero-title-wrapper">
+        <h1 class="hero-title">
+            <span id="typewriter-text"></span><span class="typewriter-cursor">|</span>
+        </h1>
+    </div>
+
+    <!-- 鼠标效果 JS（ES Module，仅桌面端） -->
+    <script type="module">
+        const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768;
+        if (!isMobile) {
+            const s = document.createElement('script');
+            s.type = 'module';
+            s.src = 'mouse-effect.js';
+            document.body.appendChild(s);
+        } else {
+            // 手机端隐藏 webgl canvas
+            const c = document.getElementById('webgl-canvas');
+            if (c) c.style.display = 'none';
+        }
+    </script>
+
+    <!-- 打字机效果 -->
+    <script>
+        (function () {
+            const phrases = ["I'm a Designer", "You can call me Jiho"];
+            let phraseIndex = 0;
+            let charIndex = 0;
+            let isDeleting = false;
+
+            const el = document.getElementById('typewriter-text');
+
+            // 配置（毫秒）
+            const TYPE_SPEED   = 90;   // 打字速度
+            const DELETE_SPEED = 45;   // 删字速度（快速）
+            const PAUSE_AFTER  = 2200; // 打完后停顿
+            const PAUSE_BEFORE = 300;  // 删完后停顿
+
+            function tick() {
+                const current = phrases[phraseIndex];
+
+                if (!isDeleting) {
+                    // 正在打字
+                    charIndex++;
+                    el.textContent = current.slice(0, charIndex);
+
+                    if (charIndex === current.length) {
+                        // 打完，停顿后开始删
+                        isDeleting = true;
+                        setTimeout(tick, PAUSE_AFTER);
+                        return;
+                    }
+                    setTimeout(tick, TYPE_SPEED);
+                } else {
+                    // 正在删字
+                    charIndex--;
+                    el.textContent = current.slice(0, charIndex);
+
+                    if (charIndex === 0) {
+                        // 删完，切换到下一句
+                        isDeleting = false;
+                        phraseIndex = (phraseIndex + 1) % phrases.length;
+                        setTimeout(tick, PAUSE_BEFORE);
+                        return;
+                    }
+                    setTimeout(tick, DELETE_SPEED);
+                }
+            }
+
+            // 页面加载后短暂延迟再开始
+            setTimeout(tick, 800);
+        })();
+    </script>
+    <!-- 背景音乐控制 -->
+    <script>
+        (function () {
+            const music   = document.getElementById('bg-music');
+            const btn     = document.getElementById('mute-btn');
+            const iconOn  = document.getElementById('icon-sound');
+            const iconOff = document.getElementById('icon-mute');
+
+            music.volume = 0.35;
+            let playing = false;
+
+            function tryPlay() {
+                if (playing) return;
+                music.play().then(() => { playing = true; }).catch(() => {});
+            }
+
+            // 第一次任意交互后自动播放（绕过浏览器限制）
+            ['click', 'keydown', 'touchstart', 'mousemove'].forEach(evt => {
+                document.addEventListener(evt, tryPlay, { once: true });
+            });
+
+            // 静音切换
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (music.paused) {
+                    music.play().then(() => { playing = true; });
+                    iconOn.style.display  = '';
+                    iconOff.style.display = 'none';
+                } else {
+                    music.pause();
+                    iconOn.style.display  = 'none';
+                    iconOff.style.display = '';
+                }
+            });
+        })();
+    </script>
+
+    <!-- 视差视频效果（仅桌面端） -->
+    <script>
+        (function () {
+            // 触控设备或窄屏不启用视差
+            const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768;
+            if (isMobile) return;
+
+            const video = document.querySelector('.bg-video');
+            // 最大偏移像素（水平/垂直）
+            const MAX_X = 18;
+            const MAX_Y = 10;
+            // 平滑系数（越小越慢越丝滑）
+            const EASE = 0.06;
+
+            let targetX = 0, targetY = 0;
+            let currentX = 0, currentY = 0;
+
+            // 让视频稍微大于视口，才有移动空间
+            video.style.width  = (100 + MAX_X * 2 / window.innerWidth  * 100) + 'vw';
+            video.style.height = (100 + MAX_Y * 2 / window.innerHeight * 100) + 'vh';
+            video.style.left   = (-MAX_X) + 'px';
+            video.style.top    = (-MAX_Y) + 'px';
+
+            window.addEventListener('mousemove', (e) => {
+                // 归一化到 -1 ~ 1
+                const nx = (e.clientX / window.innerWidth  - 0.5) * 2;
+                const ny = (e.clientY / window.innerHeight - 0.5) * 2;
+                // 鼠标往右 → 视频往左（反向）
+                targetX = -nx * MAX_X;
+                targetY = -ny * MAX_Y;
+            });
+
+            (function loop() {
+                currentX += (targetX - currentX) * EASE;
+                currentY += (targetY - currentY) * EASE;
+                video.style.transform = `translate(${currentX}px, ${currentY}px)`;
+                requestAnimationFrame(loop);
+            })();
+        })();
+    </script>
+
+    <!-- Works 圆形展开过渡（纯 CSS，不截帧，无卡顿） -->
+    <script>
+        (function () {
+            // 电脑屏幕在视频 2560×1440 中的圆心位置（百分比）
+            const CX = '56.6%';  // 1449/2560（X1366+83 的中心）
+            const CY = '39.0%';  // 561/1440
+            const START_R = '3px';
+
+            function startTransition(e) {
+                e.preventDefault();
+                const targetHref = e.currentTarget.href;
+
+                const overlay = document.getElementById('transition-overlay');
+                if (!overlay) return;
+
+                // 立即显示黑幕，从屏幕位置的小圆开始
+                const maxR = Math.max(window.innerWidth, window.innerHeight) * 1.6;
+                overlay.style.cssText = `
+                    position:fixed; top:0; left:0;
+                    width:100vw; height:100vh;
+                    background:#000;
+                    z-index:999;
+                    clip-path: circle(${START_R} at ${CX} ${CY});
+                `;
+
+                // 下一帧启动动画：展开到全屏
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        overlay.style.transition = 'clip-path 0.35s cubic-bezier(0.4,0,0.2,1)';
+                        overlay.style.clipPath = `circle(${maxR}px at ${CX} ${CY})`;
+                    });
+                });
+
+                // 动画结束前提前跳转，视觉无感知
+                setTimeout(() => { window.location.href = targetHref; }, 350);
+            }
+
+            const worksLink = document.getElementById('nav-works');
+            if (worksLink) worksLink.addEventListener('click', startTransition);
+        })();
+    </script>
 
 </body>
-</html>	
- 
+</html>

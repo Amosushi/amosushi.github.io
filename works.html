@@ -1,85 +1,939 @@
 <!DOCTYPE html>
-<html>
-<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
-<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-<meta name="viewport" content="width=width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
- <head>
- 	<title>
- 		Works
- 	</title>
-    <link rel="stylesheet" type="text/css" href="styleofworks.css"/>
-    <link rel="stylesheet" type="text/css" href="bootstrap.css"/>
-    <link href="/img/favicon.ico" rel="shortcut icon" />
- </head>
- <body>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Works</title>
+    <link rel="icon" href="favicon.png" type="image/png">
 
-<nav class="navbar navbar-light bg-light">
-  <a class="navbar-brand" href="index.html">
-    <img src="img/a_logo.png" width="50" height="50" class="d-inline-block align-top" alt="">
-  </a>
-  <div class="navbarright">
-  <ul class="nav nav-pills">
-    <li class="nav-item">
-      <a class="nav-link" href="index.html">Home</a>
-    </li>
-    <li class="nav-item">
-    
-    <a class="nav-link active" href="javascript:location.reload();">Work</a>
-    </li>
+    <!-- Import maps polyfill (鼠标效果用) -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.js"
+            }
+        }
+    </script>
 
-     <li class="nav-item">
-    <a class="nav-link" href="resource.html">Resource</a>
-    </li>
-  </ul>
-  </div>
-</nav>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ============================================================
+           Works 页面 — 模拟电脑桌面
+           ============================================================ */
+        body.works-page {
+            background: #000;
+            margin: 0;
+            overflow: hidden;
+        }
 
-  <div class="worktitle">
-    <h2>Design and Code</h2>
-    <p2>Hi, 我叫金智豪，你也可以叫我Amos<br/><br/>
-我拥有三年的设计经验，参与或主导过十余款产品的设计，带领过小型团队<br/><br/>
-追求美感的同时，我也持续在产品逻辑、结构以及代码上进行学习，让设计更加科学<br/><br/>
-</p2>
-  </div>
-  <div class="workpic">
-  	<div class="workpicline">
-        <a href="pages/ding/ding.html" target="_blank"><img src="img/works/16.jpg"></a>
+        /* 过渡动画黑幕（首页点击 Works 时展开，works 页面加载后负责淡出） */
+        #transition-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: #000;
+            z-index: 999;
+            /* 入场：黑幕保持 100ms 后开始淡出，屏幕渐亮 */
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
 
-        <a href="pages/heyhoney/heyhoney.html" target="_blank"><img src="img/works/7.jpg"></a>
+        /* WebGL canvas — 鼠标效果层 */
+        #webgl-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
 
-        <a href="pages/meibo/meibo.html" target="_blank"><img src="img/works/8.jpg"></a>
+        /* CRT 效果叠层 */
+        .crt-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .crt-scanlines {
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 3px,
+                rgba(0, 0, 0, 0.14) 3px,
+                rgba(0, 0, 0, 0.14) 4px
+            );
+        }
+        .crt-scan-beam {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: linear-gradient(
+                to bottom,
+                transparent 0%,
+                rgba(180, 220, 200, 0.03) 40%,
+                rgba(180, 220, 200, 0.06) 50%,
+                rgba(180, 220, 200, 0.03) 60%,
+                transparent 100%
+            );
+            animation: scanBeam 6s linear infinite;
+            top: -80px;
+        }
+        @keyframes scanBeam {
+            0%   { top: -80px; }
+            100% { top: 100%; }
+        }
+        .crt-vignette {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(
+                ellipse at center,
+                transparent 55%,
+                rgba(0, 0, 0, 0.65) 100%
+            );
+        }
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            92% { opacity: 1; }
+            93% { opacity: 0.94; }
+            94% { opacity: 1; }
+            97% { opacity: 0.97; }
+        }
+        .crt-overlay {
+            animation: flicker 5s infinite;
+        }
 
-        <a href="pages/lailai/lailai.html" target="_blank"><img src="img/works/2.jpg"></a>
+        /* ============================================================
+           电脑屏幕容器
+           ============================================================ */
+        .computer-screen {
+            position: fixed;
+            top: 90px;
+            left: 40px;
+            right: 40px;
+            bottom: 40px;
+            background: #757575;
+            border-radius: 14px;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* 展开动画 */
+            clip-path: circle(3px at 56.6% 39.0%);
+            animation: screenExpand 0.5s cubic-bezier(0.4,0,0.2,1) 0.05s forwards;
+        }
 
-        <a href="pages/guichu/guichu.html" target="_blank"><img src="img/works/6.jpg"></a>
+        @keyframes screenExpand {
+            from { clip-path: circle(3px at 56.6% 39.0%); }
+            to   { clip-path: none; }
+        }
 
-        <a href="pages/gege/gege.html" target="_blank"><img src="img/works/9.jpg"></a>
+        /* ============================================================
+           状态栏
+           ============================================================ */
+        .screen-titlebar {
+            flex-shrink: 0;
+            height: 32px;
+            background: #DDDDDD;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            user-select: none;
+        }
 
-        <a href="pages/videer/videer.html" target="_blank"><img src="img/works/12.jpg"></a>
+        /* 状态栏左区：Logo + 菜单项 */
+        .titlebar-left {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
 
-        <a href="pages/dribbble/dribbble.html" target="_blank"><img src="img/works/3.jpg"></a>
+        .titlebar-logo {
+            width: 26px;
+            height: 20px;
+            margin-right: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .titlebar-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
 
+        .titlebar-menu {
+            display: flex;
+            align-items: center;
+        }
 
-        <a href="pages/icon/icon.html" target="_blank"><img src="img/works/11.jpg"></a>
+        /* 详情视图标题栏 */
+        .detail-titlebar {
+            flex-shrink: 0;
+            height: 32px;
+            background: #DDDDDD;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            user-select: none;
+        }
+        .detail-titlebar.hidden,
+        .desktop-titlebar.hidden {
+            display: none;
+        }
+        .detail-title-name {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 11px;
+            color: #000;
+            letter-spacing: 0.5px;
+        }
+        .detail-close-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: default;
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 11px;
+            color: #000;
+            letter-spacing: 0.5px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            transition: background 0.15s;
+        }
+        .detail-close-btn:hover {
+            background: rgba(0,0,0,0.12);
+        }
 
-        <a href="pages/wechatredesign/wechatredesign.html" target="_blank"><img src="img/works/1.png"></a>
+        /* ============================================================
+           Info 弹窗
+           ============================================================ */
+        .info-popup-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.4);
+        }
+        .info-popup-overlay.active {
+            display: flex;
+        }
 
-        <a href="pages/concept/concept.html" target="_blank"><img src="img/works/15.jpg"></a> 
+        /* 数独弹窗用 fixed，覆盖整个屏幕 */
+        #sudoku-popup {
+            position: fixed !important;
+            inset: 0;
+            z-index: 300;
+            background: rgba(0,0,0,0.55);
+        }
+        .info-popup {
+            background: #DDDDDD;
+            border-radius: 8px;
+            width: 580px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+        }
+        .info-popup-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            height: 28px;
+            background: #EEEEEE;
+            flex-shrink: 0;
+        }
+        .info-popup-title {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 11px;
+            color: #000;
+            letter-spacing: 0.5px;
+        }
+        .info-popup-close {
+            display: flex;
+            align-items: center;
+            cursor: default;
+            padding: 2px 4px;
+            border-radius: 2px;
+            transition: background 0.15s;
+        }
+        .info-popup-close:hover {
+            background: rgba(0,0,0,0.1);
+        }
+        .info-popup-close img {
+            width: 12px;
+            height: 12px;
+            display: block;
+        }
+        .info-popup-shadow {
+            height: 3px;
+            background: #000;
+            flex-shrink: 0;
+        }
+        .info-popup-body {
+            padding: 24px 28px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            overflow: hidden;
+        }
 
-        <a href="pages/poster/poster.html" target="_blank"><img src="img/works/4.png"></a>
+        .info-popup-body iframe {
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .info-logo-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .info-logo-row span {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 16px;
+            color: #000;
+            letter-spacing: 0.5px;
+            line-height: 1;
+            padding-bottom: 2px;
+        }
+        .info-logo-row img {
+            width: 22px;
+            height: 18px;
+            object-fit: contain;
+            display: block;
+            padding-bottom: 1px;
+        }
+        .info-lines {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        .info-line {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 10px;
+            color: #000;
+            letter-spacing: 0.3px;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .info-copyright {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 5px;
+            color: rgba(0,0,0,0.5);
+            letter-spacing: 0.2px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .detail-close-btn svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
 
-        <a href="pages/motion/motion.html" target="_blank"><img src="img/works/14.gif"></a>
+        .titlebar-menu span {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 11px;
+            color: #000;
+            padding: 2px 12px;
+            cursor: default;
+            letter-spacing: 0.5px;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+        .titlebar-menu span:hover {
+            background: rgba(0,0,0,0.12);
+            border-radius: 2px;
+        }
 
-        <a href="pages/3d/3d.html" target="_blank"><img src="img/works/5.png"></a>
+        /* 状态栏右区：时钟 */
+        .titlebar-clock {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 11px;
+            color: #000;
+            letter-spacing: 0.5px;
+            min-width: 70px;
+            text-align: right;
+        }
 
-        <a href="pages/illustration/illustration.html" target="_blank"><img src="img/works/10.jpg"></a>
+        /* 状态栏下方：纯黑阴影分割线 */
+        .screen-shadow {
+            flex-shrink: 0;
+            height: 4px;
+            background: #000;
+        }
 
-         <a href="pages/mind/mind.html" target="_blank"><img src="img/works/13.jpg"></a>
+        /* ============================================================
+           屏幕主内容区（噪波背景）
+           ============================================================ */
+        .screen-content {
+            flex: 1;
+            position: relative;
+            overflow: auto;
+        }
 
-     
+        /* 噪波马赛克效果 */
+        .screen-noise {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
 
-    </div>	
-  </div>	
-  <div class="backtop"><a href="#top"><img src="img/align_top.png"></a></div>
-  
- </body>
+        /* ============================================================
+           详情视图内容区
+           ============================================================ */
+        .detail-view {
+            position: absolute;
+            inset: 0;
+            z-index: 3;
+            display: none;
+            flex-direction: column;
+        }
+        .detail-view.active {
+            display: flex;
+        }
+        .detail-content {
+            flex: 1;
+            position: relative;
+            overflow-y: auto;
+            padding: 32px 40px;
+            display: flex;
+            flex-direction: column;
+        }
+        /* 文字格式 */
+        .detail-content .d-title {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 22px;
+            color: #fff;
+            margin: 0 0 4px;
+            line-height: 1.4;
+        }
+        .detail-content .d-subtitle {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+            margin: 0 0 20px;
+            line-height: 1.5;
+        }
+        .detail-content .d-body {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 12px;
+            color: rgba(255,255,255,0.85);
+            margin: 0 0 16px;
+            line-height: 1.8;
+        }
+        .detail-content .d-desc {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 10px;
+            color: rgba(255,255,255,0.5);
+            margin: 0 0 24px;
+            line-height: 1.8;
+        }
+        /* 图片 */
+        .detail-content .d-img {
+            width: 100%;
+            max-width: 600px;
+            display: block;
+            margin: 0 0 24px;
+            border-radius: 4px;
+        }
+
+        /* 图标网格 */
+        .icon-grid {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 28px 40px;
+            padding: 24px 28px;
+        }
+
+        /* 单个图标 */
+        .icon-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            cursor: default;
+            padding: 4px;
+            border-radius: 4px;
+            transition: background 0.1s;
+            flex-shrink: 0;
+            width: 90px;
+        }
+
+        .icon-item.selected {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .icon-item img {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .icon-item span {
+            font-family: 'FLYNN Mono', monospace;
+            font-size: 10px;
+            color: #fff;
+            text-shadow: 1px 1px 0 #000;
+            text-align: center;
+            line-height: 1.3;
+            word-break: break-word;
+            max-width: 86px;
+        }
+
+        /* ============================================================
+           图标入场动画（黑幕淡出后依次弹出）
+           ============================================================ */
+        @keyframes iconPop {
+            0%   { opacity: 0; transform: scale(0.6); }
+            70%  { opacity: 1; transform: scale(1.08); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* 初始状态：不可见，等黑幕淡出后才动画 */
+        .icon-item {
+            opacity: 0;
+        }
+
+        /* 6 个图标依次弹出，间隔 100ms */
+        .icon-item:nth-child(1) { animation: iconPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) 0.60s forwards; }
+        .icon-item:nth-child(2) { animation: iconPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) 0.70s forwards; }
+        .icon-item:nth-child(3) { animation: iconPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) 0.80s forwards; }
+        .icon-item:nth-child(4) { animation: iconPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) 0.90s forwards; }
+        .icon-item:nth-child(5) { animation: iconPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) 1.00s forwards; }
+        .icon-item:nth-child(6) { animation: iconPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) 1.10s forwards; }
+
+        /* ============================================================
+           移动端适配
+           ============================================================ */
+        @media (max-width: 768px) {
+            .computer-screen {
+                top: 80px;
+                left: 20px;
+                right: 20px;
+                bottom: 20px;
+                border-radius: 10px;
+            }
+            .titlebar-menu span {
+                padding: 3px 20px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body class="homepage works-page">
+
+    <!-- 鼠标效果 -->
+    <div id="loading" style="display:none;"></div>
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- 圆形过渡动画层（首页点击 Works 时展开的黑幕，works 页面加载后负责淡出） -->
+    <div id="transition-overlay"></div>
+
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <a href="index.html" class="nav-logo">
+            <img src="Logo.png" alt="Logo" class="logo-img">
+        </a>
+        <ul class="nav-links">
+            <li><a href="works.html">Works</a></li>
+            <li><a href="about.html">AboutMe</a></li>
+        </ul>
+    </nav>
+
+    <!-- 电脑屏幕 -->
+    <div class="computer-screen" id="computer-screen">
+        <!-- 桌面状态：Logo + 菜单 -->
+        <div class="screen-titlebar desktop-titlebar" id="desktop-titlebar">
+            <div class="titlebar-left">
+                <div class="titlebar-logo" id="info-logo-btn" style="cursor:default;">
+                    <img src="ScreenLogo.png" alt="Logo">
+                </div>
+                <div class="titlebar-menu">
+                    <span id="menu-refresh">Refresh</span>
+                    <span id="menu-sudoku">Sudoku</span>
+                </div>
+            </div>
+            <div class="titlebar-clock" id="titlebar-clock">00:00:00</div>
+        </div>
+
+        <!-- 详情状态：项目标题 + Close -->
+        <div class="detail-titlebar hidden" id="detail-titlebar">
+            <div class="detail-title-name" id="detail-title-name"></div>
+            <div class="detail-close-btn" id="detail-close-btn">
+                <span>Close</span>
+                <img src="close-fill.svg" alt="Close" style="width:14px;height:14px;flex-shrink:0;">
+            </div>
+        </div>
+
+        <!-- 阴影分割线 -->
+        <div class="screen-shadow" id="screen-shadow"></div>
+
+        <!-- 主内容区 -->
+        <div class="screen-content" id="screen-content">
+            <canvas class="screen-noise" id="noise-canvas"></canvas>
+
+            <!-- 桌面视图 -->
+            <div class="icon-grid" id="icon-grid">
+                <div class="icon-item" data-work="qts">
+                    <img src="icons/qts.png" alt="QTS">
+                    <span>QTS:2019~now</span>
+                </div>
+                <div class="icon-item" data-work="dingtalk">
+                    <img src="icons/dingtalk.png" alt="Dingtalk">
+                    <span>Dingtalk:2017~2019</span>
+                </div>
+                <div class="icon-item" data-work="blink">
+                    <img src="icons/blink.png" alt="Blink">
+                    <span>Blink:2015~2017</span>
+                </div>
+                <div class="icon-item" data-work="aidesign">
+                    <img src="icons/aidesign.png" alt="AI Design">
+                    <span>AI Design</span>
+                </div>
+                <div class="icon-item" data-work="leadership">
+                    <img src="icons/leadership.png" alt="Leadership">
+                    <span>Leadership</span>
+                </div>
+                <div class="icon-item" data-work="thisweb">
+                    <img src="icons/thisweb.png" alt="About This Website">
+                    <span>About This Website</span>
+                </div>
+            </div>
+
+            <!-- 详情视图 -->
+            <div class="detail-view" id="detail-view">
+                <div class="detail-content" id="detail-content">
+                    <!-- 动态填充 -->
+                </div>
+            </div>
+
+            <!-- 数独游戏弹窗 -->
+            <div class="info-popup-overlay" id="sudoku-popup">
+                <div class="info-popup">
+                    <div class="info-popup-header">
+                        <span class="info-popup-title">Sudoku</span>
+                        <div class="info-popup-close" id="sudoku-close-btn"></div>
+                    </div>
+                    <div class="info-popup-shadow"></div>
+                    <div class="info-popup-body">
+                        <iframe frameborder="0" src="https://itch.io/embed/279389" width="552" height="167"></iframe>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info 弹窗 -->
+            <div class="info-popup-overlay" id="info-popup">
+                <div class="info-popup">
+                    <div class="info-popup-header">
+                        <span class="info-popup-title">Info</span>
+                        <div class="info-popup-close" id="info-close-btn">
+                            <img src="close-fill.svg" alt="Close">
+                        </div>
+                    </div>
+                    <div class="info-popup-shadow"></div>
+                    <div class="info-popup-body">
+                        <div class="info-logo-row">
+                            <span>Jiho Design</span>
+                            <img src="ScreenLogo.png" alt="TM">
+                        </div>
+                        <div class="info-lines">
+                            <div class="info-line">System：Nave OS 1.0.2</div>
+                            <div class="info-line">Design Version：Version 249</div>
+                            <div class="info-line">Memory：32.0 MB</div>
+                            <div class="info-line">Disk：1.95 GB</div>
+                        </div>
+                        <div class="info-copyright">Copyright 2026 Jiho Design, Inc. All rights reserved.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CRT 效果叠层 -->
+    <div class="crt-overlay">
+        <div class="crt-scanlines"></div>
+        <div class="crt-scan-beam"></div>
+        <div class="crt-vignette"></div>
+    </div>
+
+    <!-- 鼠标效果 JS（ES Module，仅桌面端） -->
+    <script type="module">
+        const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768;
+        if (!isMobile) {
+            const s = document.createElement('script');
+            s.type = 'module';
+            s.src = 'mouse-effect.js';
+            document.body.appendChild(s);
+        } else {
+            const c = document.getElementById('webgl-canvas');
+            if (c) c.style.display = 'none';
+        }
+    </script>
+
+    <!-- 实时时钟 -->
+    <script>
+        (function () {
+            function updateClock() {
+                const now = new Date();
+                const h = String(now.getHours()).padStart(2, '0');
+                const m = String(now.getMinutes()).padStart(2, '0');
+                const s = String(now.getSeconds()).padStart(2, '0');
+                const el = document.getElementById('titlebar-clock');
+                if (el) el.textContent = `${h}:${m}:${s}`;
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        })();
+    </script>
+
+    <!-- 噪波马赛克效果 -->
+    <script>
+        (function () {
+            const canvas = document.getElementById('noise-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            function resize() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                canvas.width  = rect.width;
+                canvas.height = rect.height;
+                drawNoise();
+            }
+
+            function drawNoise() {
+                const w = canvas.width;
+                const h = canvas.height;
+                const imageData = ctx.createImageData(w, h);
+                const data = imageData.data;
+                const base = 117; // #757575 的灰度
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const noise = (Math.random() - 0.5) * 40;
+                    const val = Math.max(0, Math.min(255, Math.round(base + noise)));
+                    data[i]     = val;       // R
+                    data[i + 1] = val;       // G
+                    data[i + 2] = val;       // B
+                    data[i + 3] = 255;       // A
+                }
+                ctx.putImageData(imageData, 0, 0);
+            }
+
+            // 页面加载后生成一次静态噪波
+            window.addEventListener('load', () => {
+                resize();
+            });
+
+            window.addEventListener('resize', () => {
+                resize();
+            });
+        })();
+
+        // 淡化首页过渡动画的黑幕
+        (function () {
+            const overlay = document.getElementById('transition-overlay');
+            if (!overlay) return;
+            // 等待 works 页面加载稳定后，淡出黑幕（与 CSS transition 0.5s 同步）
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => { overlay.style.display = 'none'; }, 600);
+                });
+            });
+        })();
+
+        // ============================================================
+        // 菜单交互
+        // ============================================================
+        // Refresh — 刷新页面
+        document.getElementById('menu-refresh').addEventListener('click', () => {
+            location.reload();
+        });
+
+        // Sudoku — 弹窗
+        (function () {
+            const popup   = document.getElementById('sudoku-popup');
+            const closeBtn = document.getElementById('sudoku-close-btn');
+            if (!popup || !closeBtn) return;
+
+            // 打开
+            document.getElementById('menu-sudoku').addEventListener('click', () => {
+                popup.classList.add('active');
+            });
+
+            // 关闭（点击遮罩也可关闭）
+            popup.addEventListener('click', (e) => {
+                if (e.target === popup) popup.classList.remove('active');
+            });
+            closeBtn.addEventListener('click', () => {
+                popup.classList.remove('active');
+            });
+        })();
+
+        // 图标选中 / 双击交互 / 详情视图
+        (function () {
+            // ============================================================
+            // 作品数据
+            // ============================================================
+            const WORKS = {
+                'qts': {
+                    title: 'QTS',
+                    subtitle: 'Personal OS · 2019 — present',
+                    body: 'An operating system interface concept for personal productivity. Built with web technologies, it simulates a complete desktop environment with draggable windows, a taskbar, and a start menu.',
+                    desc: 'Role: Sole designer & developer · Platform: Web (Electron)',
+                    images: []
+                },
+                'dingtalk': {
+                    title: 'Dingtalk',
+                    subtitle: 'Enterprise Communication · 2017 — 2019',
+                    body: 'Designed UI components and interaction patterns for Alibaba\'s enterprise communication platform, serving millions of users across multiple devices.',
+                    desc: 'Role: UI Designer · Team: Alibaba Design',
+                    images: []
+                },
+                'blink': {
+                    title: 'Blink',
+                    subtitle: 'Design System · 2015 — 2017',
+                    body: 'A comprehensive design system created to unify visual language across multiple products. Includes over 200 components, a full icon set, and detailed usage guidelines.',
+                    desc: 'Role: Lead Designer',
+                    images: []
+                },
+                'aidesign': {
+                    title: 'AI Design',
+                    subtitle: 'Generative Design Tool',
+                    body: 'An experimental tool exploring the intersection of AI and traditional graphic design workflows.',
+                    desc: 'Role: Concept, Design & Development',
+                    images: []
+                },
+                'leadership': {
+                    title: 'Leadership',
+                    subtitle: 'Design Leadership',
+                    body: 'A collection of materials and frameworks developed while leading design teams, covering hiring, mentorship, and process design.',
+                    desc: 'Context: Design Management',
+                    images: []
+                },
+                'thisweb': {
+                    title: 'About This Website',
+                    subtitle: 'Portfolio Site',
+                    body: 'The site you\'re browsing right now — a personal portfolio built from scratch, featuring custom CRT effects, a retro desktop metaphor, and smooth micro-interactions.',
+                    desc: 'Built with: HTML · CSS · JS · Three.js',
+                    images: []
+                }
+            };
+
+            // ============================================================
+            // 元素引用
+            // ============================================================
+            const desktopTitlebar = document.getElementById('desktop-titlebar');
+            const detailTitlebar  = document.getElementById('detail-titlebar');
+            const detailTitleName = document.getElementById('detail-title-name');
+            const iconGrid       = document.getElementById('icon-grid');
+            const detailView     = document.getElementById('detail-view');
+            const detailContent  = document.getElementById('detail-content');
+            const closeBtn       = document.getElementById('detail-close-btn');
+
+            // ============================================================
+            // 打开详情
+            // ============================================================
+            function openDetail(id) {
+                const work = WORKS[id];
+                if (!work) return;
+
+                // 填充标题
+                detailTitleName.textContent = work.title;
+
+                // 渲染内容
+                let html = '';
+                html += `<h1 class="d-title">${work.title}</h1>`;
+                html += `<p class="d-subtitle">${work.subtitle}</p>`;
+                html += `<p class="d-body">${work.body}</p>`;
+                html += `<p class="d-desc">${work.desc}</p>`;
+                work.images.forEach(src => {
+                    html += `<img class="d-img" src="${src}" alt="">`;
+                });
+                detailContent.innerHTML = html;
+
+                // 切换视图
+                desktopTitlebar.classList.add('hidden');
+                detailTitlebar.classList.remove('hidden');
+                iconGrid.style.display  = 'none';
+                detailView.classList.add('active');
+
+                // 滚动到顶部
+                detailContent.scrollTop = 0;
+            }
+
+            // ============================================================
+            // 关闭详情
+            // ============================================================
+            function closeDetail() {
+                detailView.classList.remove('active');
+                detailTitlebar.classList.add('hidden');
+                iconGrid.style.display  = '';
+                desktopTitlebar.classList.remove('hidden');
+            }
+
+            closeBtn.addEventListener('click', closeDetail);
+
+            // ============================================================
+            // Info 弹窗
+            // ============================================================
+            const infoLogoBtn = document.getElementById('info-logo-btn');
+            const infoPopup   = document.getElementById('info-popup');
+            const infoCloseBtn = document.getElementById('info-close-btn');
+
+            function openInfoPopup() {
+                infoPopup.classList.add('active');
+            }
+            function closeInfoPopup() {
+                infoPopup.classList.remove('active');
+            }
+
+            if (infoLogoBtn) infoLogoBtn.addEventListener('click', openInfoPopup);
+            if (infoCloseBtn) infoCloseBtn.addEventListener('click', closeInfoPopup);
+            if (infoPopup) {
+                infoPopup.addEventListener('click', (e) => {
+                    if (e.target === infoPopup) closeInfoPopup();
+                });
+            }
+
+            // ============================================================
+            // 图标网格事件
+            // ============================================================
+            iconGrid.addEventListener('click', (e) => {
+                const item = e.target.closest('.icon-item');
+                if (!item) {
+                    iconGrid.querySelectorAll('.icon-item').forEach(el => el.classList.remove('selected'));
+                    return;
+                }
+                iconGrid.querySelectorAll('.icon-item').forEach(el => el.classList.remove('selected'));
+                item.classList.add('selected');
+            });
+
+            iconGrid.addEventListener('dblclick', (e) => {
+                const item = e.target.closest('.icon-item');
+                if (!item) return;
+                const id = item.dataset.work;
+                if (id) openDetail(id);
+            });
+        })();
+    </script>
+
+</body>
+</html>
