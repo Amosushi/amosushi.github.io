@@ -304,7 +304,7 @@
         if (finished) return;
         loaded++;
         const pct = Math.round((loaded / total) * 100);
-        percentEl.textContent = pct;
+        percentEl.textContent = pct + '%...';
 
         if (loaded >= total) {
             finished = true;
@@ -351,18 +351,6 @@
     document.fonts.ready.then(() => {
         setTimeout(updateProgress, 300);
     });
-
-    // 最长等待 8 秒，强制进入
-    setTimeout(() => {
-        if (!finished) {
-            finished = true;
-            percentEl.textContent = '100';
-            loadingScreen.classList.add('fade-out');
-            setTimeout(() => {
-                loadingScreen.style.display = 'none';
-            }, 600);
-        }
-    }, 8000);
 })();
 </script>
 
