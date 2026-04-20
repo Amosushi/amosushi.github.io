@@ -21,6 +21,15 @@
 </head>
 <body class="homepage">
 
+    <!-- ========== Loading 遮罩 ========== -->
+    <div id="loading-screen">
+        <div class="loading-box">
+            <div class="loading-text">
+                <span id="loading-percent">0</span><span class="loading-cursor">_</span>
+            </div>
+        </div>
+    </div>
+
     <!-- ========== 背景视频 ========== -->
     <video class="bg-video" autoplay muted loop playsinline>
         <source src="bg.mp4" type="video/mp4">
@@ -256,4 +265,79 @@
     </script>
 
 </body>
+
+<!-- ========== 预加载脚本 ========== -->
+<script>
+(function() {
+    const loadingScreen = document.getElementById('loading-screen');
+    const percentEl = document.getElementById('loading-percent');
+
+    // 需要预加载的资源
+    const resources = [
+        'bg.mp4',
+        'Flynnmono.ttf',
+        'Logo.png',
+        'keyboardSound.mp3'
+    ];
+
+    let loaded = 0;
+    const total = resources.length;
+
+    function updateProgress() {
+        loaded++;
+        const pct = Math.round((loaded / total) * 100);
+        percentEl.textContent = pct;
+
+        if (loaded >= total) {
+            // 所有资源加载完成，延迟一小段时间确保体验
+            setTimeout(() => {
+                loadingScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 600);
+            }, 200);
+        }
+    }
+
+    // 预加载图片和字体
+    resources.forEach(src => {
+        if (src.endsWith('.png') || src.endsWith('.jpg') || src.endsWith('.jpeg') || src.endsWith('.gif') || src.endsWith('.webp')) {
+            const img = new Image();
+            img.onload = updateProgress;
+            img.onerror = updateProgress;
+            img.src = src;
+        } else if (src.endsWith('.mp3') || src.endsWith('.wav') || src.endsWith('.ogg')) {
+            const audio = new Audio();
+            audio.oncanplaythrough = updateProgress;
+            audio.onerror = updateProgress;
+            audio.preload = 'auto';
+            audio.src = src;
+        }
+        // .ttf/.woff/.woff2 等字体由 CSS @font-face 加载，这里不单独处理
+        if (src.endsWith('.ttf') || src.endsWith('.woff') || src.endsWith('.woff2')) {
+            // 字体通过 CSS 加载，等待一会儿直接标记完成
+            setTimeout(updateProgress, 500);
+        }
+    });
+
+    // 视频预加载
+    const video = document.querySelector('.bg-video');
+    if (video) {
+        video.oncanplay = updateProgress;
+        video.onerror = updateProgress;
+        video.load();
+    }
+
+    // 如果 5 秒后还有资源没加载完，强制进入
+    setTimeout(() => {
+        if (loaded < total) {
+            loadingScreen.classList.add('fade-out');
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 600);
+        }
+    }, 5000);
+})();
+</script>
+
 </html>
