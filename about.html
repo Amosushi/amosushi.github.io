@@ -379,6 +379,84 @@
             filter: none;
         }
 
+        /* ============================================================
+           手机端适配：隐藏大图，显示简洁导航
+           ============================================================ */
+        @media (max-width: 767px) {
+            /* 隐藏大图和手电筒相关 */
+            .desk-bg,
+            .flashlight-mask,
+            .light-toggle {
+                display: none !important;
+            }
+
+            /* 手机端使用简洁的链接列表 */
+            .desk-content {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 32px;
+                padding: 80px 24px 40px;
+            }
+
+            .folder-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 12px;
+                opacity: 1 !important;
+                transform: none !important;
+                animation: none !important;
+            }
+
+            .folder-img-wrap {
+                display: none;
+            }
+
+            /* 使用 SVG 图标代替 */
+            .folder-icon {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 64px;
+                height: 64px;
+                background: rgba(255, 255, 255, 0.12);
+                border-radius: 16px;
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                transition: background 0.2s ease, transform 0.2s ease;
+            }
+
+            .folder-icon svg {
+                width: 28px;
+                height: 28px;
+                color: rgba(255, 255, 255, 0.9);
+            }
+
+            .folder-item:active .folder-icon {
+                background: rgba(255, 255, 255, 0.2);
+                transform: scale(0.95);
+            }
+
+            .folder-label {
+                font-family: 'FLYNN Mono', monospace;
+                font-size: 14px;
+                color: rgba(255, 255, 255, 0.8);
+                letter-spacing: 2px;
+            }
+
+            /* 手机端纸张展开：全屏覆盖 */
+            body.paper-open .paper-overlay {
+                border-radius: 0 !important;
+            }
+
+            body.paper-open .paper-content {
+                padding: 80px 24px 40px;
+            }
+        }
+
     </style>
 </head>
 <body class="aboutpage">
@@ -408,18 +486,43 @@
             <div class="folder-img-wrap">
                 <img class="folder-img" src="me.png" alt="ME">
             </div>
+            <!-- 手机端图标 -->
+            <div class="folder-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            </div>
+            <span class="folder-label">ME</span>
         </div>
 
         <div class="folder-item" data-folder="works">
             <div class="folder-img-wrap">
                 <img class="folder-img" src="experience.png" alt="EXPERIENCE">
             </div>
+            <!-- 手机端图标 -->
+            <div class="folder-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+            </div>
+            <span class="folder-label">EXPERIENCE</span>
         </div>
 
         <div class="folder-item" data-folder="contact">
             <div class="folder-img-wrap">
                 <img class="folder-img" src="contact.png" alt="CONTACT">
             </div>
+            <!-- 手机端图标 -->
+            <div class="folder-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+            </div>
+            <span class="folder-label">CONTACT</span>
         </div>
 
     </div>
@@ -456,6 +559,20 @@
     <div id="transition-overlay"></div>
 
     <script>
+        // ============================================================
+        // 手机端适配
+        // ============================================================
+        const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768;
+
+        // 手机端：默认开灯，隐藏手电筒
+        if (isMobile) {
+            document.body.classList.add('light-on');
+            const flashMask = document.getElementById('flashlight-mask');
+            if (flashMask) flashMask.style.display = 'none';
+            const lightToggle = document.getElementById('light-toggle');
+            if (lightToggle) lightToggle.style.display = 'none';
+        }
+
         // ============================================================
         // 各文件夹的纸张内容
         // ============================================================

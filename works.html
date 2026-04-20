@@ -568,7 +568,6 @@
                 </div>
                 <div class="titlebar-menu">
                     <span id="menu-refresh">Refresh</span>
-                    <span id="menu-sudoku">Sudoku</span>
                 </div>
             </div>
             <div class="titlebar-clock" id="titlebar-clock">00:00:00</div>
@@ -622,20 +621,6 @@
             <div class="detail-view" id="detail-view">
                 <div class="detail-content" id="detail-content">
                     <!-- 动态填充 -->
-                </div>
-            </div>
-
-            <!-- 数独游戏弹窗 -->
-            <div class="info-popup-overlay" id="sudoku-popup">
-                <div class="info-popup">
-                    <div class="info-popup-header">
-                        <span class="info-popup-title">Sudoku</span>
-                        <div class="info-popup-close" id="sudoku-close-btn"></div>
-                    </div>
-                    <div class="info-popup-shadow"></div>
-                    <div class="info-popup-body">
-                        <iframe frameborder="0" src="https://itch.io/embed/279389" width="552" height="167"></iframe>
-                    </div>
                 </div>
             </div>
 
@@ -766,26 +751,6 @@
         document.getElementById('menu-refresh').addEventListener('click', () => {
             location.reload();
         });
-
-        // Sudoku — 弹窗
-        (function () {
-            const popup   = document.getElementById('sudoku-popup');
-            const closeBtn = document.getElementById('sudoku-close-btn');
-            if (!popup || !closeBtn) return;
-
-            // 打开
-            document.getElementById('menu-sudoku').addEventListener('click', () => {
-                popup.classList.add('active');
-            });
-
-            // 关闭（点击遮罩也可关闭）
-            popup.addEventListener('click', (e) => {
-                if (e.target === popup) popup.classList.remove('active');
-            });
-            closeBtn.addEventListener('click', () => {
-                popup.classList.remove('active');
-            });
-        })();
 
         // 图标选中 / 双击交互 / 详情视图
         (function () {

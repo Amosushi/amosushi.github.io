@@ -96,7 +96,7 @@
     <!-- 打字机效果 -->
     <script>
         (function () {
-            const phrases = ["I'm a Designer", "You can call me Jiho"];
+            const phrases = ["Jiho's Lab", "Jiho's Workspace"];
             let phraseIndex = 0;
             let charIndex = 0;
             let isDeleting = false;
@@ -280,63 +280,67 @@
         'keyboardSound.mp3'
     ];
 
-    let loaded = 0;
     const total = resources.length;
+    let loadedCount = 0;
 
-    function updateProgress() {
-        loaded++;
-        const pct = Math.round((loaded / total) * 100);
+    // 启动进度动画：每 30ms 增加 1%
+    const interval = setInterval(() => {
+        loadedCount++;
+        const pct = Math.min(loadedCount, 100);
         percentEl.textContent = pct;
 
-        if (loaded >= total) {
-            // 所有资源加载完成，延迟一小段时间确保体验
+        if (pct >= 100) {
+            clearInterval(interval);
+            // 加载完成，淡出
             setTimeout(() => {
                 loadingScreen.classList.add('fade-out');
                 setTimeout(() => {
                     loadingScreen.style.display = 'none';
                 }, 600);
-            }, 200);
+            }, 100);
         }
+    }, 30);
+
+    // 资源加载监听
+    function onResourceReady() {
+        clearInterval(interval);
+        percentEl.textContent = '100';
+        setTimeout(() => {
+            loadingScreen.classList.add('fade-out');
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 600);
+        }, 100);
     }
 
-    // 预加载图片和字体
+    // 图片预加载
     resources.forEach(src => {
         if (src.endsWith('.png') || src.endsWith('.jpg') || src.endsWith('.jpeg') || src.endsWith('.gif') || src.endsWith('.webp')) {
             const img = new Image();
-            img.onload = updateProgress;
-            img.onerror = updateProgress;
+            img.onload = onResourceReady;
+            img.onerror = onResourceReady;
             img.src = src;
         } else if (src.endsWith('.mp3') || src.endsWith('.wav') || src.endsWith('.ogg')) {
             const audio = new Audio();
-            audio.oncanplaythrough = updateProgress;
-            audio.onerror = updateProgress;
+            audio.oncanplaythrough = onResourceReady;
+            audio.onerror = onResourceReady;
             audio.preload = 'auto';
             audio.src = src;
-        }
-        // .ttf/.woff/.woff2 等字体由 CSS @font-face 加载，这里不单独处理
-        if (src.endsWith('.ttf') || src.endsWith('.woff') || src.endsWith('.woff2')) {
-            // 字体通过 CSS 加载，等待一会儿直接标记完成
-            setTimeout(updateProgress, 500);
         }
     });
 
     // 视频预加载
     const video = document.querySelector('.bg-video');
     if (video) {
-        video.oncanplay = updateProgress;
-        video.onerror = updateProgress;
+        video.oncanplay = onResourceReady;
+        video.onerror = onResourceReady;
         video.load();
     }
 
-    // 如果 5 秒后还有资源没加载完，强制进入
-    setTimeout(() => {
-        if (loaded < total) {
-            loadingScreen.classList.add('fade-out');
-            setTimeout(() => {
-                loadingScreen.style.display = 'none';
-            }, 600);
-        }
-    }, 5000);
+    // 字体加载检测
+    document.fonts.ready.then(() => {
+        setTimeout(onResourceReady, 200);
+    });
 })();
 </script>
 
