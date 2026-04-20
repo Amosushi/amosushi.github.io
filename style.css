@@ -10,7 +10,7 @@
 /* FLYNN Mono 本地字体声明 */
 @font-face {
     font-family: 'FLYNN Mono';
-    src: local('FLYNN Mono'), local('FLYNNMono');
+    src: url('Flynnmono.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
 }
