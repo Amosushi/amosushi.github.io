@@ -272,18 +272,33 @@
     const loadingScreen = document.getElementById('loading-screen');
     const percentEl = document.getElementById('loading-percent');
 
-    // 需要预加载的资源
+    // 需要预加载的资源（首页 + Works + AboutMe）
     const resources = [
+        // 首页
         'bg.mp4',
-        'Flynnmono.ttf',
         'Logo.png',
+        // Works 页面
+        'WorksBG.png',
+        'icons/qts.png',
+        'icons/dingtalk.png',
+        'icons/blink.png',
+        'icons/aidesign.png',
+        'icons/leadership.png',
+        'icons/thisweb.png',
+        // AboutMe 页面
+        'AboutMeBG.png',
+        'me.png',
+        'experience.png',
+        'contact.png',
+        // 字体 + 音频
+        'Flynnmono.ttf',
         'keyboardSound.mp3'
     ];
 
-    const total = resources.length;
     let loadedCount = 0;
+    const total = resources.length;
 
-    // 启动进度动画：每 30ms 增加 1%
+    // 每 30ms 增加 1%，完整动画约 3 秒
     const interval = setInterval(() => {
         loadedCount++;
         const pct = Math.min(loadedCount, 100);
@@ -291,56 +306,69 @@
 
         if (pct >= 100) {
             clearInterval(interval);
-            // 加载完成，淡出
-            setTimeout(() => {
-                loadingScreen.classList.add('fade-out');
-                setTimeout(() => {
-                    loadingScreen.style.display = 'none';
-                }, 600);
-            }, 100);
         }
     }, 30);
 
-    // 资源加载监听
-    function onResourceReady() {
-        clearInterval(interval);
+    // 资源加载完成检测
+    let finished = false;
+    function checkDone() {
+        if (finished) return;
+        loadedCount = total;
         percentEl.textContent = '100';
+        finished = true;
+        clearInterval(interval);
         setTimeout(() => {
             loadingScreen.classList.add('fade-out');
             setTimeout(() => {
                 loadingScreen.style.display = 'none';
             }, 600);
-        }, 100);
+        }, 150);
     }
 
     // 图片预加载
     resources.forEach(src => {
         if (src.endsWith('.png') || src.endsWith('.jpg') || src.endsWith('.jpeg') || src.endsWith('.gif') || src.endsWith('.webp')) {
             const img = new Image();
-            img.onload = onResourceReady;
-            img.onerror = onResourceReady;
+            img.onload = checkDone;
+            img.onerror = checkDone;
             img.src = src;
         } else if (src.endsWith('.mp3') || src.endsWith('.wav') || src.endsWith('.ogg')) {
             const audio = new Audio();
-            audio.oncanplaythrough = onResourceReady;
-            audio.onerror = onResourceReady;
+            audio.oncanplaythrough = checkDone;
+            audio.onerror = checkDone;
             audio.preload = 'auto';
             audio.src = src;
+        } else if (src.endsWith('.ttf') || src.endsWith('.woff') || src.endsWith('.woff2')) {
+            // 字体延迟检测
+            setTimeout(checkDone, 800);
         }
     });
 
     // 视频预加载
     const video = document.querySelector('.bg-video');
     if (video) {
-        video.oncanplay = onResourceReady;
-        video.onerror = onResourceReady;
+        video.oncanplay = checkDone;
+        video.onerror = checkDone;
         video.load();
     }
 
     // 字体加载检测
     document.fonts.ready.then(() => {
-        setTimeout(onResourceReady, 200);
+        setTimeout(checkDone, 300);
     });
+
+    // 最长等待 6 秒，强制进入
+    setTimeout(() => {
+        if (!finished) {
+            loadedCount = total;
+            percentEl.textContent = '100';
+            clearInterval(interval);
+            loadingScreen.classList.add('fade-out');
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 600);
+        }
+    }, 6000);
 })();
 </script>
 
