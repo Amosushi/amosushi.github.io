@@ -1,0 +1,264 @@
+/* ============================================
+   FPS Buddy - 首页样式
+   ============================================ */
+
+/* 页面 */
+.home-page {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* 背景 */
+.home-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.home-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Logo - 放大1倍 */
+.logo {
+  position: absolute;
+  top: 80px;
+  left: 80px;
+  z-index: 10;
+  width: 160px;
+}
+
+.logo img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* 主按钮区域 - 左对齐，和Logo有间距 */
+.main-buttons {
+  position: absolute;
+  top: 280px;
+  left: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 10;
+}
+
+/* 主按钮通用样式 - 小按钮/次要按钮用白色 */
+.main-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+
+  /* 白色0.8 + 背景模糊 */
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.main-btn:active {
+  transform: scale(0.98);
+}
+
+/* 大按钮 - 主按钮用主题色 */
+.large-btn {
+  background: rgba(28, 255, 198, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* 按钮文字容器 */
+.btn-text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* 大按钮 */
+.large-btn {
+  width: 400px;
+  height: 130px;
+  border-radius: 24px;
+  padding: 20px;
+  background: rgba(28, 255, 198, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(28, 255, 198, 0.3);
+}
+
+/* 大按钮文字 */
+.large-btn .btn-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 48px;
+  font-weight: 400;
+  color: #000000;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.large-btn .btn-subtitle {
+  font-size: 16px;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+/* 小按钮容器 */
+.small-buttons {
+  display: flex;
+  gap: 16px;
+}
+
+/* 小按钮 */
+.small-btn {
+  width: 192px;
+  height: 100px;
+  border-radius: 20px;
+  padding: 14px;
+}
+
+/* 小按钮文字 */
+.small-btn .btn-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  font-weight: 400;
+  color: #000000;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.small-btn .btn-subtitle {
+  font-size: 16px;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+/* 底部图标 - 和Logo左对齐 */
+.bottom-icons {
+  position: absolute;
+  bottom: 80px;
+  left: 80px;
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+}
+
+.icon-btn {
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+
+  /* 圆形 */
+  border-radius: 50%;
+
+  /* 白色0.8 + 背景模糊 */
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #000000;
+  transition: transform 0.2s ease;
+}
+
+.icon-btn:hover {
+  transform: scale(1.1);
+}
+
+.icon-btn svg {
+  stroke: #000000;
+}
+
+/* 文字按钮 - 和图标按钮风格一致 */
+.text-btn {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #000000;
+  font-size: 14px;
+  font-weight: 600;
+  transition: transform 0.2s ease;
+}
+
+.text-btn:hover {
+  transform: scale(1.05);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .logo {
+    top: 40px;
+    left: 24px;
+    width: 60px;
+  }
+
+  .main-buttons {
+    top: 200px;
+    left: 24px;
+  }
+
+  .large-btn {
+    width: 280px;
+    height: 100px;
+  }
+
+  .large-btn .btn-title {
+    font-size: 36px;
+  }
+
+  .large-btn .btn-subtitle {
+    font-size: 14px;
+  }
+
+  .small-buttons {
+    flex-direction: column;
+  }
+
+  .small-btn {
+    width: 280px;
+    height: 80px;
+  }
+
+  .small-btn .btn-title {
+    font-size: 24px;
+  }
+
+  .small-btn .btn-subtitle {
+    font-size: 14px;
+  }
+
+  .bottom-icons {
+    bottom: 40px;
+    left: 24px;
+  }
+}

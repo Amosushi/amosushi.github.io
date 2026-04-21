@@ -1,0 +1,246 @@
+/* ============================================
+  FPS Buddy - 个人中心样式
+  ============================================ */
+
+/* 页面 */
+.profile-page {
+  background: url('../images/playerBG.webp') center center / cover no-repeat;
+  overflow-y: auto;
+  min-height: 100vh;
+  position: relative;
+}
+
+.profile-page::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* 容器 */
+.profile-container {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0;
+  padding: var(--spacing-xl);
+  padding-left: 80px;
+}
+
+/* 顶部导航 */
+.profile-nav {
+  margin-bottom: var(--spacing-xl);
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-back svg {
+  stroke: currentColor;
+}
+
+/* 统计概览 */
+.stats-overview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+@media (max-width: 768px) {
+  .stats-overview {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.overview-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: var(--spacing-lg);
+  text-align: left;
+}
+
+.overview-value {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: var(--spacing-xs);
+}
+
+.overview-value.primary { color: var(--color-primary); }
+.overview-value.secondary { color: var(--color-secondary); }
+.overview-value.accent { color: var(--color-accent); }
+
+.overview-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* 勋章展示 */
+.badges-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.section-header {
+  margin-bottom: var(--spacing-lg);
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.badge-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: var(--spacing-lg);
+  transition: all var(--transition-fast);
+}
+
+.badge-card.unlocked {
+  border-color: rgba(255, 165, 2, 0.3);
+  background: rgba(255, 165, 2, 0.05);
+}
+
+.badge-card.locked {
+  opacity: 0.4;
+}
+
+.badge-image {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--spacing-sm);
+  display: block;
+}
+
+.badge-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.badge-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+}
+
+/* 历史记录 */
+.records-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.records-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.record-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--spacing-md);
+  align-items: center;
+  padding: var(--spacing-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+
+.record-mode {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.record-mode.serious { color: var(--color-primary); }
+.record-mode.casual { color: var(--color-secondary); }
+.record-mode.infinite { color: #9c88ff; }
+.record-mode.challenge { color: var(--color-accent); }
+
+.record-info {
+  display: flex;
+  gap: var(--spacing-lg);
+}
+
+.record-stat {
+  text-align: left;
+}
+
+.record-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.record-stat-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.record-time {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: right;
+}
+
+.records-actions {
+  text-align: left;
+}
+
+.records-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.records-actions .btn svg {
+  stroke: currentColor;
+}
+
+/* 操作按钮 */
+.action-buttons {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-xl);
+  border-top: 1px solid var(--color-border);
+}
+
+.action-buttons .btn {
+  flex: 1;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: left;
+  padding: var(--spacing-2xl) 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.empty-icon {
+  margin-bottom: var(--spacing-md);
+  opacity: 0.4;
+}
+
+.empty-icon svg {
+  stroke: currentColor;
+}

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FPS Buddy - 练枪神器</title>
+  <link rel="icon" href="images/FPSLogo.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/index.css">
+</head>
+<body class="home-page">
+  <!-- 背景 -->
+  <div class="home-bg">
+    <img src="images/BG.jpg" alt="背景">
+  </div>
+
+  <!-- 左上角 Logo -->
+  <div class="logo">
+    <img src="images/FPSLogo.png" alt="FPS Buddy">
+  </div>
+
+  <!-- 左下角图标 -->
+  <div class="bottom-icons">
+    <a href="profile.html" class="icon-btn" title="个人中心">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </a>
+    <button class="icon-btn" id="settingsBtn" title="设置">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+    <a href="https://jiho.work/" target="_blank" class="text-btn" title="关于作者">关于作者</a>
+  </div>
+
+  <!-- 主按钮区域 -->
+  <div class="main-buttons">
+    <!-- 大按钮：Start -->
+    <a href="training.html?mode=serious" class="main-btn large-btn">
+      <div class="btn-text">
+        <div class="btn-title">Start</div>
+        <div class="btn-subtitle">认真练枪模式</div>
+      </div>
+    </a>
+
+    <!-- 两个小按钮并排 -->
+    <div class="small-buttons">
+      <a href="training.html?mode=casual" class="main-btn small-btn">
+        <div class="btn-text">
+          <div class="btn-title">Chill Aim</div>
+          <div class="btn-subtitle">摸鱼练枪模式</div>
+        </div>
+      </a>
+      <a href="training.html?mode=infinite" class="main-btn small-btn">
+        <div class="btn-text">
+          <div class="btn-title">Infinite</div>
+          <div class="btn-subtitle">无限模式</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    // 直接绑定设置按钮
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+      const settings = Storage.getSettings();
+      UI.showSettings(settings, (newSettings) => {
+        Storage.saveSettings(newSettings);
+        UI.toast('设置已保存', 'success');
+      });
+    });
+    
+    // 3D 倾斜效果
+    document.querySelectorAll('.main-btn').forEach(btn => {
+      btn.addEventListener('mousemove', (e) => {
+        const rect = btn.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        
+        // 计算倾斜角度
+        const rotateX = (y - centerY) / centerY * -8;
+        const rotateY = (x - centerX) / centerX * 8;
+        
+        btn.style.transform = `perspective(500px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+      });
+      
+      btn.addEventListener('mouseleave', () => {
+        btn.style.transform = '';
+      });
+    });
+  </script>
+
+</body>
+</html>
