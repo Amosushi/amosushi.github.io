@@ -519,6 +519,7 @@
         .icon-item:nth-child(4) { animation: iconPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) 0.90s forwards; }
         .icon-item:nth-child(5) { animation: iconPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) 1.00s forwards; }
         .icon-item:nth-child(6) { animation: iconPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) 1.10s forwards; }
+        .icon-item:nth-child(7) { animation: iconPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) 1.20s forwards; }
 
         /* ============================================================
            移动端适配
@@ -606,6 +607,10 @@
                 <div class="icon-item" data-work="aidesign">
                     <img src="icons/aidesign.webp" alt="AI Design">
                     <span>AI Design</span>
+                </div>
+                <div class="icon-item" data-work="fpsbuddy" data-url="https://fpsbuddy.pages.dev">
+                    <img src="icons/fpsbuddy.webp" alt="FPSbuddy">
+                    <span>FPSbuddy</span>
                 </div>
                 <div class="icon-item" data-work="leadership">
                     <img src="icons/leadership.webp" alt="Leadership">
@@ -895,6 +900,12 @@
                 const item = e.target.closest('.icon-item');
                 if (!item) return;
                 const id = item.dataset.work;
+                const url = item.dataset.url;
+                // 如果有外部链接，新标签页打开
+                if (url) {
+                    window.open(url, '_blank');
+                    return;
+                }
                 if (id) openDetail(id);
             });
         })();
