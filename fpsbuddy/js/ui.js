@@ -234,10 +234,6 @@ const UI = {
     const content = `
       <div class="report-container">
         <div class="report-header">
-          <div class="report-level" style="color: ${levelConfig.color}">
-            ${levelConfig.name}
-          </div>
-          <p class="report-desc">${levelConfig.description}</p>
         </div>
 
         <div class="report-stats">
