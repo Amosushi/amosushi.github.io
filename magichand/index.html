@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MagicHand - Gesture Controlled Neural Network</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Serif+JP:wght@300;400&display=swap" rel="stylesheet">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button id="start-btn">Start Gesture Control</button>
+<div id="loading-overlay" class="hidden">
+  <div class="spinner"></div>
+  <p id="loading-text">Loading gesture model...</p>
+</div>
+<canvas id="neural-canvas"></canvas>
+<div id="camera-container" class="hidden">
+  <video id="webcam" autoplay playsinline></video>
+  <canvas id="hand-canvas"></canvas>
+  <div id="gesture-label">Waiting...</div>
+</div>
+<div id="status-panel" class="panel">
+  <h2>MagicHand</h2>
+  <div class="status-row"><span>Formation</span><span id="s-formation">Quantum Cortex</span></div>
+  <div class="status-row"><span>Theme</span><span id="s-theme">Flame</span></div>
+  <div class="status-row"><span>Density</span><span id="s-density">100%</span></div>
+  <div class="status-row"><span>Gesture</span><span id="s-gesture">--</span></div>
+  <div class="status-row"><span>Confidence</span><span id="s-confidence">--</span></div>
+</div>
+<div id="guide-panel" class="panel">
+  <h2>Controls</h2>
+  <div class="guide-item"><span class="g">Fist</span> &mdash; Pulse</div>
+  <div class="guide-item"><span class="g">Open Hand</span> &mdash; Switch Formation</div>
+  <div class="guide-item"><span class="g">Peace</span> &mdash; Switch Theme</div>
+  <div class="guide-item"><span class="g">Thumb Up</span> &mdash; Density +</div>
+  <div class="guide-item"><span class="g">Thumb Down</span> &mdash; Density -</div>
+  <div class="guide-item"><span class="g">Flip</span> &mdash; Rotate 180</div>
+</div>
+<div id="toast"></div>
+<a id="author-btn" href="https://jiho.work" target="_blank" rel="noopener">About the Author</a>
+
+<!-- Intro overlay -->
+<div id="intro-overlay">
+  <div id="intro-text">
+    <p class="intro-line" id="intro-line1">君が宇宙に呼びかければ</p>
+    <p class="intro-line" id="intro-line2">銀河は君のために舞い踊る</p>
+  </div>
+</div>
+
+<!-- MediaPipe — must load before importmap and module script -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/selfie_segmentation.js" crossorigin="anonymous"></script>
+<script>
+  window.Hands = window.Hands;
+  window.Camera = window.Camera;
+  window.drawConnectors = window.drawConnectors;
+  window.drawLandmarks = window.drawLandmarks;
+  window.HAND_CONNECTIONS = window.HAND_CONNECTIONS;
+  window.SelfieSegmentation = window.SelfieSegmentation;
+  console.log('[MagicHand] MediaPipe loaded');
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

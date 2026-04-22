@@ -1,0 +1,151 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; font-family: 'Inter', sans-serif; color: #eee; }
+
+#neural-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+
+/* ---- Camera ---- */
+#camera-container {
+  position: fixed; bottom: 20px; left: 20px;
+  width: 260px; height: 195px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.25);
+  overflow: hidden; z-index: 20; background: #000;
+  box-shadow: 0 4px 24px rgba(0,0,0,.6); transition: opacity .3s;
+}
+#camera-container.hidden { opacity: 0; pointer-events: none; }
+#webcam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; visibility: hidden; position: absolute; }
+#hand-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); pointer-events: none; background: #000; z-index: 1; }
+#gesture-label {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.75); backdrop-filter: blur(6px);
+  padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  color: #fff; white-space: nowrap; border: 1px solid rgba(255,255,255,.2);
+}
+
+/* ---- Panels ---- */
+.panel {
+  position: fixed; z-index: 20; backdrop-filter: blur(10px);
+  background: rgba(0,0,0,.55); border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.15); padding: 16px 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+#status-panel { top: 20px; left: 20px; min-width: 210px; }
+#guide-panel { top: 20px; right: 20px; max-width: 230px; }
+.panel h2 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #fff; letter-spacing: .5px; text-transform: uppercase; }
+.status-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; color: rgba(255,255,255,.5); }
+.status-row span:last-child { color: rgba(255,255,255,.9); font-weight: 600; }
+.guide-item { font-size: 12px; line-height: 1.7; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.06); color: rgba(255,255,255,.6); }
+.guide-item:last-child { border-bottom: none; }
+.guide-item .g { color: #fff; font-weight: 600; }
+
+/* ---- Start Button ---- */
+#start-btn {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 30; background: transparent;
+  color: #fff; border: 1px solid rgba(255,255,255,.6); padding: 16px 44px; border-radius: 8px;
+  font-size: 16px; font-weight: 600; font-family: 'Inter', sans-serif;
+  cursor: pointer; letter-spacing: 1px; text-transform: uppercase;
+  box-shadow: 0 0 40px rgba(255,255,255,.05); transition: all .2s;
+}
+#start-btn:hover {
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.9);
+  box-shadow: 0 0 60px rgba(255,255,255,.1);
+}
+#start-btn.hidden { display: none; }
+
+/* ---- Loading ---- */
+#loading-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 50;
+  background: rgba(0,0,0,.88); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+}
+#loading-overlay.hidden { display: none; }
+.spinner { width: 40px; height: 40px; border: 2px solid rgba(255,255,255,.15); border-top-color: rgba(255,255,255,.8); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading-overlay p { color: rgba(255,255,255,.5); font-size: 14px; }
+
+/* ---- Toast ---- */
+#toast {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(.9);
+  z-index: 40; background: rgba(0,0,0,.6); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.2); color: #fff;
+  padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 600;
+  pointer-events: none; opacity: 0; transition: opacity .25s, transform .25s;
+  letter-spacing: .5px;
+}
+#toast.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+
+@media (max-width: 640px) {
+  #camera-container { width: 160px; height: 120px; bottom: 10px; left: 10px; }
+  #status-panel { top: 10px; left: 10px; min-width: 170px; padding: 12px 14px; }
+  #guide-panel { display: none; }
+}
+
+/* ---- Intro Overlay ---- */
+#intro-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #000; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.8s ease-out;
+  pointer-events: none;
+}
+#intro-overlay.fade-out {
+  opacity: 0;
+}
+#intro-text {
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+}
+.intro-line {
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 300;
+  font-size: 28px;
+  color: rgba(255, 255, 255, 0);
+  letter-spacing: 6px;
+  line-height: 1.8;
+  opacity: 0;
+  transform: translateY(12px);
+}
+.intro-line.show {
+  color: rgba(255, 255, 255, 0.85);
+  opacity: 1;
+  transform: translateY(0);
+  transition: color 1.2s ease-in, opacity 1.2s ease-in, transform 1.2s ease-in;
+}
+
+/* ---- UI hidden during intro ---- */
+body.intro-active #start-btn,
+body.intro-active #status-panel,
+body.intro-active #guide-panel,
+body.intro-active #camera-container,
+body.intro-active #toast,
+body.intro-active #author-btn {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0s !important;
+}
+body.ui-reveal #start-btn { transition-delay: 0.2s; }
+body.ui-reveal #status-panel { transition-delay: 0.3s; }
+body.ui-reveal #guide-panel { transition-delay: 0.4s; }
+body.ui-reveal #author-btn { transition-delay: 0.5s; }
+
+/* ---- Author Button ---- */
+#author-btn {
+  position: fixed; bottom: 20px; right: 20px; z-index: 20;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.25);
+  color: rgba(255,255,255,.5);
+  font-size: 12px; font-weight: 600; font-family: 'Inter', sans-serif;
+  padding: 8px 16px; border-radius: 6px;
+  text-decoration: none; letter-spacing: .5px;
+  cursor: pointer; transition: all .2s;
+}
+#author-btn:hover {
+  color: #fff;
+  border-color: rgba(255,255,255,.6);
+  background: rgba(255,255,255,.06);
+}
+
+@media (max-width: 640px) {
+  #author-btn { bottom: 10px; right: 10px; font-size: 11px; padding: 6px 12px; }
+}
