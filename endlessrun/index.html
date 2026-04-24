@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Endless Run</title>
+  <link rel="icon" href="assets/runLogo.webp" type="image/webp" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-wrapper">
+    <!-- 游戏主 Canvas（始终渲染，背景层） -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- ===== 开始界面 UI ===== -->
+    <div id="screen-home" class="screen active">
+      <!-- 左上角关于 -->
+      <a id="btn-about" class="corner-btn" href="https://jiho.work" target="_blank" rel="noopener">About the Author</a>
+
+      <!-- 右上角音乐 -->
+      <button id="btn-music" class="corner-btn corner-btn--right" title="Toggle Sound">
+        <svg id="music-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+        <span id="music-label">Sound On</span>
+      </button>
+
+      <!-- Logo 区 -->
+      <div id="home-top">
+        <img id="home-logo-img" src="assets/runLogo.webp" alt="logo" />
+      </div>
+
+      <!-- 中心按钮区 -->
+      <div id="home-center">
+        <div id="best-score-display">BEST: <span id="best-dist">0</span> m</div>
+        <button id="btn-start" class="btn-breathe" aria-label="Start">
+          <img src="assets/start.png" alt="Start" />
+        </button>
+        <button id="btn-gallery" class="btn-gallery" aria-label="Achievements">
+          <img src="assets/gallery.webp" alt="Gallery" />
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== 游戏界面 HUD ===== -->
+    <div id="screen-game" class="screen">
+      <div id="hud">
+        <span id="dist-display">0 m</span>
+      </div>
+    </div>
+
+    <!-- ===== Game Over 界面 ===== -->
+    <div id="screen-gameover" class="screen">
+      <!-- 左上角关于 -->
+      <a id="btn-about-go" class="corner-btn" href="https://jiho.work" target="_blank" rel="noopener">About the Author</a>
+
+      <!-- 右上角音乐 -->
+      <button id="btn-music-go" class="corner-btn corner-btn--right" title="Toggle Sound">
+        <svg id="music-icon-svg-go" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+        <span id="music-label-go">Sound On</span>
+      </button>
+
+      <img id="gameover-img" src="assets/gameover.webp" alt="Game Over" />
+      <div id="gameover-score">DIST: <span id="final-dist">0</span></div>
+      <div id="gameover-best">BEST: <span id="gameover-best-dist">0</span></div>
+      <button id="btn-restart" class="btn-action btn-breathe" aria-label="Restart">
+        <img src="assets/restart.webp" alt="Restart" />
+      </button>
+      <button id="btn-home" class="btn-action" aria-label="Home">
+        <img src="assets/home.webp" alt="Home" />
+      </button>
+    </div>
+
+    <!-- ===== 成就画廊（全屏） ===== -->
+    <div id="screen-gallery" class="screen">
+      <div id="gallery-header">
+        <span id="gallery-title">Gallery</span>
+        <button id="btn-gallery-close" class="btn-icon-dark" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div id="gallery-grid">
+        <!-- 8 张卡片由 JS 动态生成 -->
+      </div>
+    </div>
+
+    <!-- ===== 卡片全屏展示 ===== -->
+    <div id="screen-card-full" class="screen">
+      <button id="btn-card-close" class="btn-icon-dark btn-card-close" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <div id="card-full-content">
+        <img id="card-full-img" src="" alt="" />
+        <div id="card-full-info">
+          <div id="card-full-name"></div>
+          <div id="card-full-dist"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
