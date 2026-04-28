@@ -883,6 +883,10 @@ const DEFAULT_STATE = () => ({
 
 let state = loadState();
 
+// ─── Hourly settlement counter ──────────────────────────────────
+// Must be declared before loadState (which initializes it)
+let settledHours = 0;
+
 // Initialize settledHours based on current status
 if (state.statusEnd && state.status !== 'idle') {
   const elapsedMs = Date.now() - (state.lastTick || Date.now());
@@ -974,9 +978,6 @@ function applyMetabolism(s) {
 }
 
 // ─── Hourly settlement for sleep/rest/work ──────────────────────
-// Track how many full hours have been settled
-let settledHours = 0;
-
 function applyHourlySettlement() {
   if (!state.statusEnd || state.status === 'idle') return;
   const elapsedMs = Date.now() - state.lastTick;
