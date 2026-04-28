@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="assets/info-mood.svg">
+  <title>Cutie Pet</title>
+  <style>
+    :root {
+      --accent: #A38D5D;
+      --accent-light: #c4b280;
+      --bg-card: rgba(255,255,255,0.55);
+      --bg-card-solid: #f8f6f1;
+      --text: #3a3530;
+      --text-light: #8a8279;
+      --border: rgba(163,141,93,0.25);
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --radius: 16px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      overflow: hidden;
+      font-family: -apple-system, "SF Pro Display", system-ui, sans-serif;
+      color: var(--text);
+    }
+    canvas#three-canvas { display: block; width: 100vw; height: 100vh; }
+
+    /* ── Loading ── */
+    #loading {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #fff; color: #fff; gap: 16px;
+      transition: opacity 0.6s ease;
+    }
+    #loading.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid rgba(163,141,93,0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── UI Overlay ── */
+    #ui {
+      position: fixed; inset: 0; z-index: 10;
+      pointer-events: none;
+      opacity: 0; transition: opacity 0.5s ease;
+    }
+    #ui.active { opacity: 1; }
+    #ui > * { pointer-events: auto; }
+
+    /* ── Stats Bar (top-left, single row, no bg) ── */
+    .stats-panel {
+      position: absolute;
+      left: 28px;
+      top: 24px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stat-icon {
+      width: 20px;
+      height: 20px;
+    }
+    .stat-icon img {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .stat-val { font-weight: 700; color: var(--text); font-size: 13px; }
+    .stat-label { font-size: 10px; color: var(--text-light); margin-left: -4px; }
+
+    /* ── Chat Bubble (above 3D screen) ── */
+    .chat-panel {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -100%);
+      max-width: 300px;
+      z-index: 15;
+    }
+    .chat-bubble {
+      padding: 12px 18px;
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 18px 18px 18px 4px;
+      font-size: 14px; line-height: 1.6;
+      color: var(--text);
+      box-shadow: var(--shadow);
+      min-height: 44px;
+    }
+    .chat-bubble .cursor {
+      display: inline-block;
+      width: 2px; height: 1em;
+      background: var(--accent);
+      margin-left: 2px;
+      animation: blink 0.6s step-end infinite;
+      vertical-align: text-bottom;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Bottom Actions (bottom-center, flat row) ── */
+    .bottom-actions {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+    }
+
+    /* ── Top-right status hint ── */
+    .top-right-hint {
+      position: absolute;
+      top: 24px;
+      right: 28px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-light);
+    }
+
+    .btn-action {
+      padding: 18px 26px;
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 32px;
+      font-size: 16px; font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .btn-action:hover { background: rgba(255,255,255,0.85); transform: translateY(-2px); box-shadow: var(--shadow); }
+    .btn-action:active { transform: translateY(0); }
+    .btn-action.disabled {
+      opacity: 0.4; cursor: not-allowed;
+      transform: none !important; box-shadow: none !important;
+    }
+
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.35);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: auto; }
+    .modal {
+      background: #fff;
+      border-radius: 24px;
+      padding: 36px 32px 28px;
+      max-width: 380px; width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+      text-align: center;
+      transform: scale(0.9) translateY(20px);
+      transition: transform 0.3s ease;
+    }
+    .modal-overlay.show .modal { transform: scale(1) translateY(0); }
+    .modal-icon { font-size: 56px; margin-bottom: 16px; }
+    .modal-icon img { width: 56px; height: 56px; }
+    .btn-icon { width: 28px; height: 28px; }
+    .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .modal-desc { font-size: 14px; color: var(--text-light); line-height: 1.6; margin-bottom: 24px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .btn-modal {
+      padding: 10px 28px;
+      border-radius: 24px;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+    }
+    .btn-modal-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .btn-modal-primary:hover { background: var(--accent-light); }
+    .btn-modal-ghost {
+      background: transparent;
+      color: var(--text-light);
+    }
+    .btn-modal-ghost:hover { background: rgba(0,0,0,0.04); }
+
+    /* ── Shop Modal ── */
+    .shop-items { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    .shop-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      background: #faf9f6;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+    .shop-item-info { text-align: left; }
+    .shop-item-name { font-size: 14px; font-weight: 600; }
+    .shop-item-desc { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+    .btn-buy {
+      padding: 6px 16px;
+      background: var(--accent);
+      color: #fff;
+      border: none; border-radius: 16px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .btn-buy:hover { background: var(--accent-light); }
+    .btn-buy:disabled { opacity: 0.4; cursor: not-allowed; }
+    .shop-balance {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-light);
+      margin-bottom: 16px;
+    }
+    .shop-balance strong { color: var(--accent); font-size: 18px; }
+
+    /* ── Feed Picker Modal ── */
+    .feed-items { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    .feed-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      background: #faf9f6;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+    .feed-item-info { text-align: left; }
+    .feed-item-name { font-size: 14px; font-weight: 600; }
+    .feed-item-desc { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+    .feed-item-count { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+    .btn-feed-use {
+      padding: 6px 16px;
+      background: var(--accent);
+      color: #fff;
+      border: none; border-radius: 16px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .btn-feed-use:hover { background: var(--accent-light); }
+    .btn-feed-use:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Time Picker Modal ── */
+    .time-options { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px; }
+    .btn-time {
+      padding: 8px 18px;
+      background: #faf9f6;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      font-size: 14px; font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-time:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-60px);
+      padding: 10px 24px;
+      background: rgba(0,0,0,0.75);
+      color: #fff; font-size: 13px;
+      border-radius: 20px;
+      z-index: 200;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      opacity: 0; pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+</div>
+
+<canvas id="three-canvas"></canvas>
+
+<!-- ── UI Overlay ── -->
+<div id="ui">
+  <!-- Stats Bar (top-left) -->
+  <div class="stats-panel">
+    <div class="stat-item">
+      <div class="stat-icon"><img src="assets/info-mood.svg" alt="心情"></div>
+      <div>
+        <div class="stat-val" id="val-mood">普通</div>
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon"><img src="assets/info-hunger.svg" alt="饥饿"></div>
+      <div>
+        <div class="stat-val">饥饿:<span id="val-hunger">60</span></div>
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon"><img src="assets/info-energy.svg" alt="精力"></div>
+      <div>
+        <div class="stat-val">精力:<span id="val-energy">80</span></div>
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon"><img src="assets/info-health.svg" alt="生命"></div>
+      <div>
+        <div class="stat-val">生命:<span id="val-hp">100</span></div>
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon"><img src="assets/info-coin.svg" alt="金币"></div>
+      <div>
+        <div class="stat-val">金币:<span id="val-coin">50</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Bubble (above 3D screen) -->
+  <div class="chat-panel">
+    <div class="chat-bubble" id="chat-bubble">
+      <span id="chat-text"></span><span class="cursor" id="chat-cursor"></span>
+    </div>
+  </div>
+
+  <!-- Top-right: status hint -->
+  <div class="top-right-hint">
+    <span id="status-hint"></span>
+  </div>
+
+  <!-- Bottom Actions (center, flat row) -->
+  <div class="bottom-actions">
+    <button class="btn-action" id="btn-feed" onclick="openFeedPicker()"><img src="assets/feed.webp" class="btn-icon">喂食</button>
+    <button class="btn-action" id="btn-play" onclick="openPlayModal()"><img src="assets/toy.webp" class="btn-icon">玩耍</button>
+    <button class="btn-action" id="btn-sleep" onclick="openTimePicker('sleep')"><img src="assets/sleep.webp" class="btn-icon">睡觉</button>
+    <button class="btn-action" id="btn-rest" onclick="openTimePicker('rest')"><img src="assets/rest.webp" class="btn-icon">休息</button>
+    <button class="btn-action" id="btn-work" onclick="openTimePicker('work')"><img src="assets/work.webp" class="btn-icon">打工</button>
+    <button class="btn-action" id="btn-shop" onclick="openShop()"><img src="assets/shop.webp" class="btn-icon">商店</button>
+    <button class="btn-action" id="btn-settings" onclick="openSettings()"><img src="assets/setting.webp" class="btn-icon">设置</button>
+  </div>
+</div>
+
+<!-- ── Modals ── -->
+<!-- Reset Confirm -->
+<div class="modal-overlay" id="modal-reset">
+  <div class="modal">
+    <div class="modal-icon"><img src="assets/why.webp"></div>
+    <div class="modal-title">负心人，你真的要放弃我吗？</div>
+    <div class="modal-desc">你舍得吗呜呜呜</div>
+    <div class="modal-btns">
+      <button class="btn-modal btn-modal-ghost" onclick="closeModal('modal-reset')">再想想</button>
+      <button class="btn-modal btn-modal-primary" onclick="doReset()">确认放弃</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Bye -->
+<div class="modal-overlay" id="modal-bye">
+  <div class="modal">
+    <div class="modal-icon"><img src="assets/bye.webp"></div>
+    <div class="modal-title">再见了…主人…</div>
+    <div class="modal-desc">期待下次再见面…</div>
+  </div>
+</div>
+
+<!-- Feed Picker -->
+<div class="modal-overlay" id="modal-feed">
+  <div class="modal">
+    <div class="modal-icon"><img src="assets/feed.webp"></div>
+    <div class="modal-title">选择口粮</div>
+    <div class="modal-desc">选择一种口粮来喂食宠物</div>
+    <div class="feed-items">
+      <div class="feed-item">
+        <div class="feed-item-info">
+          <div class="feed-item-name"><img src="assets/foodbasic.webp" class="btn-icon"> 基础口粮</div>
+          <div class="feed-item-desc">饥饿+20</div>
+          <div class="feed-item-count" id="feed-count-basic">库存：2</div>
+        </div>
+        <button class="btn-feed-use" onclick="useFeed('basic')" id="btn-feed-basic">喂食</button>
+      </div>
+      <div class="feed-item">
+        <div class="feed-item-info">
+          <div class="feed-item-name"><img src="assets/feedhigh.webp" class="btn-icon"> 豪华口粮</div>
+          <div class="feed-item-desc">饥饿+40，心情+10</div>
+          <div class="feed-item-count" id="feed-count-premium">库存：1</div>
+        </div>
+        <button class="btn-feed-use" onclick="useFeed('premium')" id="btn-feed-premium">喂食</button>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal btn-modal-ghost" onclick="closeModal('modal-feed')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Time Picker (sleep/rest/work) -->
+<div class="modal-overlay" id="modal-time">
+  <div class="modal">
+    <div class="modal-icon" id="time-icon"></div>
+    <div class="modal-title" id="time-title">选择时长</div>
+    <div class="modal-desc" id="time-desc">每小时恢复精力+12，生命+5</div>
+    <div class="time-options" id="time-options"></div>
+    <div class="modal-btns">
+      <button class="btn-modal btn-modal-ghost" onclick="closeModal('modal-time')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Play Modal -->
+<div class="modal-overlay" id="modal-play">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-icon"><img src="assets/toy.webp"></div>
+    <div class="modal-title">玩耍</div>
+    <div class="shop-items">
+      <div class="shop-item">
+        <div class="shop-item-info">
+          <div class="shop-item-name"><img src="assets/toy.webp" class="btn-icon"> 玩耍一次</div>
+          <div class="shop-item-desc">心情+30，精力-15，饥饿-10</div>
+        </div>
+        <button class="btn-buy" onclick="doPlay()">玩！</button>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal btn-modal-ghost" onclick="closeModal('modal-play')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shop -->
+<div class="modal-overlay" id="modal-shop">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-icon"><img src="assets/shop.webp"></div>
+    <div class="modal-title">宠物商店</div>
+    <div class="shop-balance">金币余额：<strong id="shop-coin">50</strong></div>
+    <div class="shop-items">
+      <div class="shop-item">
+        <div class="shop-item-info">
+          <div class="shop-item-name"><img src="assets/foodbasic.webp" class="btn-icon"> 基础口粮</div>
+          <div class="shop-item-desc">饥饿+20</div>
+        </div>
+        <button class="btn-buy" onclick="buyItem('basic')" id="btn-buy-basic">10 <img src="assets/info-coin.svg" style="width:14px;height:14px;vertical-align:middle;margin-left:1px"></button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-item-info">
+          <div class="shop-item-name"><img src="assets/feedhigh.webp" class="btn-icon"> 豪华口粮</div>
+          <div class="shop-item-desc">饥饿+40，心情+10</div>
+        </div>
+        <button class="btn-buy" onclick="buyItem('premium')" id="btn-buy-premium">25 <img src="assets/info-coin.svg" style="width:14px;height:14px;vertical-align:middle;margin-left:1px"></button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-item-info">
+          <div class="shop-item-name"><img src="assets/drug.webp" class="btn-icon"> 药品</div>
+          <div class="shop-item-desc">生命+20，治愈生病，心情+10</div>
+        </div>
+        <button class="btn-buy" onclick="buyItem('medicine')" id="btn-buy-medicine">50 <img src="assets/info-coin.svg" style="width:14px;height:14px;vertical-align:middle;margin-left:1px"></button>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal btn-modal-ghost" onclick="closeModal('modal-shop')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal">
+    <div class="modal-icon"><img src="assets/setting.webp"></div>
+    <div class="modal-title">设置</div>
+    <div class="modal-btns" style="flex-direction: column; gap: 8px; margin-bottom: 16px;">
+      <button class="btn-modal" style="width:100%; justify-content: center;" onclick="closeModal('modal-settings'); confirmReset();">重新开始</button>
+      <button class="btn-modal" style="width:100%; justify-content: center;" onclick="window.open('https://jiho.work','_blank')">关于作者</button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal btn-modal-ghost" onclick="closeModal('modal-settings')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game Over (non-dismissible) -->
+<div class="modal-overlay modal-noclose" id="modal-gameover">
+  <div class="modal">
+    <div class="modal-icon"><img src="assets/death.webp"></div>
+    <div class="modal-title">猫猫Die了</div>
+    <div class="modal-desc">重新孵化新的猫猫吧…</div>
+    <div class="modal-btns">
+      <button class="btn-modal btn-modal-primary" onclick="resetGame()">重新孵化</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.152.2/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+
+// ─── Screen UV region ─────────────────────────────────────────
+const TEX_SIZE  = 2048;
+const SCREEN_X1 = 507,  SCREEN_X2 = 1411;
+const SCREEN_Y1 = 1046, SCREEN_Y2 = 1953;
+const SCREEN_PX_W = SCREEN_X2 - SCREEN_X1;
+const SCREEN_PX_H = SCREEN_Y2 - SCREEN_Y1;
+
+// ─── Renderer ─────────────────────────────────────────────────
+const canvas = document.getElementById('three-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+
+// ─── Animated gradient background ──────────────────────────────
+const bgColors = ['#FFFBD9', '#D9FFE8', '#D9F1FF', '#FCD9FF', '#FFD9DA'];
+let bgIdx = 0, bgNextIdx = 1, bgT = 0;
+
+function lerpColor(a, b, t) {
+  const ah = parseInt(a.slice(1), 16), bh = parseInt(b.slice(1), 16);
+  const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
+  const br = (bh >> 16) & 0xff, bg_ = (bh >> 8) & 0xff, bb = bh & 0xff;
+  return `rgb(${Math.round(ar+(br-ar)*t)},${Math.round(ag+(bg_-ag)*t)},${Math.round(ab+(bb-ab)*t)})`;
+}
+
+function updateBgGradient(dt) {
+  bgT += dt / 5000;
+  if (bgT >= 1) { bgT -= 1; bgIdx = bgNextIdx; bgNextIdx = (bgNextIdx + 1) % bgColors.length; }
+  document.body.style.background = `linear-gradient(to bottom, ${lerpColor(bgColors[bgIdx], bgColors[bgNextIdx], bgT)}, #FFFFFF)`;
+}
+
+// ─── Camera & Controls ────────────────────────────────────────
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 6, 22);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enableRotate = true;
+controls.enableZoom = false;
+controls.enablePan = false;
+controls.minPolarAngle = Math.PI / 2;
+controls.maxPolarAngle = Math.PI / 2;
+controls.target.set(0, 3, 0);
+controls.update();
+
+// ─── Lighting ─────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const keyLight = new THREE.DirectionalLight(0xfff4e0, 2.0);
+keyLight.position.set(5, 12, 8);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024, 1024);
+Object.assign(keyLight.shadow.camera, { near: 0.5, far: 60, left: -10, right: 10, top: 10, bottom: -10 });
+scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0xc8d8ff, 0.8);
+fillLight.position.set(-6, 4, -5);
+scene.add(fillLight);
+const rimLight = new THREE.DirectionalLight(0xffe0a0, 0.5);
+rimLight.position.set(0, -3, -8);
+scene.add(rimLight);
+
+// ─── Screen Canvas ─────────────────────────────────────────────
+const texCanvas = document.createElement('canvas');
+texCanvas.width = TEX_SIZE;
+texCanvas.height = TEX_SIZE;
+const tctx = texCanvas.getContext('2d');
+
+const origScreenImg = new Image();
+origScreenImg.src = 'assets/tamagotchi_screen_BaseColor.png';
+let origLoaded = false;
+origScreenImg.onload = () => { origLoaded = true; };
+
+// Pet state images
+const petImages = {};
+const petStateList = ['normal','happy','angry','ill','hungry','full','die','tired','eat','work','rest','sleep'];
+let petImagesLoaded = 0;
+petStateList.forEach(name => {
+  const img = new Image();
+  img.src = `assets/${name}.png`;
+  img.onload = () => {
+    petImages[name] = img;
+    petImagesLoaded++;
+  };
+});
+
+// Current display mode: 'auto' (priority-based) or action name like 'eat','work','rest','sleep'
+let screenDisplayMode = 'auto';
+let screenDisplayEnd = 0; // timestamp when action display ends (for eat: 5s)
+
+function getAutoPetImage() {
+  if (petImages.ill && state.sick) return 'ill';
+  if (petImages.hungry && state.hunger <= 0) return 'hungry';
+  if (petImages.full && state.hunger > 100) return 'full';
+  if (petImages.die && state.hp < 10) return 'die';
+  if (petImages.tired && state.energy < 10) return 'tired';
+  if (petImages.angry && state.mood === 'sad') return 'angry';
+  if (petImages.happy && state.mood === 'happy') return 'happy';
+  return 'normal';
+}
+
+function getCurrentPetImage() {
+  const now = Date.now();
+  if (screenDisplayMode !== 'auto') {
+    if (screenDisplayMode === 'eat' && now >= screenDisplayEnd) {
+      screenDisplayMode = 'auto';
+      screenDisplayEnd = 0;
+    }
+    // work/rest/sleep: cleared by completeStatus
+  }
+  const key = screenDisplayMode === 'auto' ? getAutoPetImage() : screenDisplayMode;
+  return petImages[key] || petImages.normal || null;
+}
+
+// Screen inner padding & corner radius
+const SCREEN_PAD = 18;
+const SCREEN_RADIUS = 32;
+
+function roundRect(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+function drawScreen() {
+  if (origLoaded) {
+    tctx.drawImage(origScreenImg, 0, 0, TEX_SIZE, TEX_SIZE);
+  } else {
+    tctx.fillStyle = '#111';
+    tctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+  }
+
+  // Screen inner area with rounded corners + white bg
+  const sx = SCREEN_X1 + SCREEN_PAD;
+  const sy = SCREEN_Y1 + SCREEN_PAD;
+  const sw = SCREEN_PX_W - SCREEN_PAD * 2;
+  const sh = SCREEN_PX_H - SCREEN_PAD * 2;
+
+  tctx.save();
+  // Clip to rounded rect
+  roundRect(tctx, sx, sy, sw, sh, SCREEN_RADIUS);
+  tctx.clip();
+
+  // White background
+  tctx.fillStyle = '#FFFFFF';
+  tctx.fillRect(sx, sy, sw, sh);
+
+  // Draw pet image
+  const petImg = getCurrentPetImage();
+  if (petImg) {
+    // Fit image inside, preserving aspect ratio
+    const imgRatio = petImg.width / petImg.height;
+    const areaRatio = sw / sh;
+    let dw, dh, dx, dy;
+    if (imgRatio > areaRatio) {
+      dw = sw * 0.9;
+      dh = dw / imgRatio;
+    } else {
+      dh = sh * 0.9;
+      dw = dh * imgRatio;
+    }
+    dx = sx + (sw - dw) / 2;
+    dy = sy + (sh - dh) / 2;
+    tctx.drawImage(petImg, dx, dy, dw, dh);
+  }
+
+  tctx.restore();
+}
+
+// ─── CanvasTexture ────────────────────────────────────────────
+const screenTex = new THREE.CanvasTexture(texCanvas);
+screenTex.colorSpace = THREE.SRGBColorSpace;
+screenTex.flipY = true;
+
+// ─── Textures ─────────────────────────────────────────────────
+const tl = new THREE.TextureLoader();
+const srgb = THREE.SRGBColorSpace;
+const lin  = THREE.LinearSRGBColorSpace;
+function lt(name, cs = srgb) { const t = tl.load(`assets/${name}`); t.colorSpace = cs; return t; }
+
+const T = {
+  shellBase: lt('tamagotchi_shell_BaseColor.png'),
+  shellNrm:  lt('tamagotchi_shell_Normal.png', lin),
+  shellORM:  lt('tamagotchi_shell_OcclusionRoughnessMetallic.png', lin),
+  metalBase: lt('tamagotchi_metal_BaseColor.png'),
+  metalNrm:  lt('tamagotchi_metal_Normal.png', lin),
+  metalORM:  lt('tamagotchi_metal_OcclusionRoughnessMetallic.png', lin),
+  btnBase:   lt('tamagotchi_buttons_BaseColor.png'),
+  btnNrm:    lt('tamagotchi_buttons_Normal.png', lin),
+  btnORM:    lt('tamagotchi_buttons_OcclusionRoughnessMetallic.png', lin),
+  screenNrm: lt('tamagotchi_screen_Normal.png', lin),
+  screenORM: lt('tamagotchi_screen_OcclusionRoughnessMetallic.png', lin),
+};
+
+function stdMat(base, nrm, orm) {
+  return new THREE.MeshStandardMaterial({
+    map: base, normalMap: nrm, aoMap: orm, roughnessMap: orm, metalnessMap: orm,
+    roughness: 1, metalness: 1,
+  });
+}
+
+function screenMat() {
+  return new THREE.MeshStandardMaterial({
+    map: screenTex,
+    normalMap: T.screenNrm,
+    roughness: 0.3,
+    metalness: 0,
+  });
+}
+
+// ─── FBX Load ─────────────────────────────────────────────────
+const fbxLoader = new FBXLoader();
+
+fbxLoader.load('assets/tamagotchi.fbx',
+  (fbx) => {
+    const box = new THREE.Box3().setFromObject(fbx);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 25 / maxDim;
+    fbx.scale.setScalar(scale);
+    const center = box.getCenter(new THREE.Vector3());
+    fbx.position.set(-center.x * scale, -center.y * scale + 9, -center.z * scale);
+
+    fbx.traverse((child) => {
+      if (!child.isMesh) return;
+      child.castShadow = true;
+      child.receiveShadow = true;
+      const origMats = Array.isArray(child.material) ? child.material : [child.material];
+
+      if (origMats.length > 1) {
+        child.material = origMats.map(m => {
+          const n = (m && m.name) ? m.name.toLowerCase() : '';
+          if (n.includes('screen')) return screenMat();
+          if (n.includes('shell'))  return stdMat(T.shellBase, T.shellNrm, T.shellORM);
+          if (n.includes('metal'))  return stdMat(T.metalBase, T.metalNrm, T.metalORM);
+          if (n.includes('button')) return stdMat(T.btnBase, T.btnNrm, T.btnORM);
+          return stdMat(T.shellBase, T.shellNrm, T.shellORM);
+        });
+      } else {
+        const n = (origMats[0] && origMats[0].name) ? origMats[0].name.toLowerCase() : '';
+        if (n.includes('screen')) child.material = screenMat();
+        else if (n.includes('metal'))  child.material = stdMat(T.metalBase, T.metalNrm, T.metalORM);
+        else if (n.includes('button')) child.material = stdMat(T.btnBase, T.btnNrm, T.btnORM);
+        else child.material = stdMat(T.shellBase, T.shellNrm, T.shellORM);
+      }
+    });
+
+    scene.add(fbx);
+
+    // Entry animation
+    fbx.rotation.y = -Math.PI * 0.6;
+    controls.enabled = false;
+    const introStart = performance.now();
+    const introDur = 1800;
+    function easeOutElastic(t) {
+      if (t === 0 || t === 1) return t;
+      return Math.pow(2, -10 * t) * Math.sin((t - 0.1) * (2 * Math.PI) / 0.4) + 1;
+    }
+    function introTick() {
+      const p = Math.min((performance.now() - introStart) / introDur, 1);
+      fbx.rotation.y = -Math.PI * 0.6 * (1 - easeOutElastic(p));
+      if (p < 1) requestAnimationFrame(introTick);
+      else { fbx.rotation.y = 0; controls.enabled = true; }
+    }
+    setTimeout(introTick, 300);
+
+    // Show UI
+    document.getElementById('ui').classList.add('active');
+    document.getElementById('loading').classList.add('hidden');
+    setTimeout(() => document.getElementById('loading').remove(), 700);
+  },
+  (xhr) => {
+    if (xhr.total) {
+      const p = document.querySelector('#loading p');
+      if (p) p.textContent = `Loading... ${Math.round(xhr.loaded / xhr.total * 100)}%`;
+    }
+  },
+  (err) => console.error(err)
+);
+
+// ─── Resize ───────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ─── Render loop ──────────────────────────────────────────────
+let lastTime = performance.now();
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = now - lastTime; lastTime = now;
+  updateBgGradient(dt);
+  drawScreen();
+  screenTex.needsUpdate = true;
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate(performance.now());
+
+// ═══════════════════════════════════════════════════════════════
+//  GAME LOGIC
+// ═══════════════════════════════════════════════════════════════
+
+// ─── Game State ───────────────────────────────────────────────
+const DEFAULT_STATE = () => ({
+  mood: 'normal',       // happy, normal, sad
+  hunger: 60,
+  energy: 80,
+  hp: 100,
+  coins: 50,
+  sick: false,
+  status: 'idle',       // idle, sleeping, resting, working
+  statusEnd: null,      // timestamp when status ends
+  lastTick: Date.now(), // last metabolism tick
+  lastSickCheck: Date.now(),
+  items: { basic: 2, premium: 1, medicine: 0 },
+  isDead: false,
+});
+
+let state = loadState();
+
+function saveState() {
+  localStorage.setItem('cutiepet_state', JSON.stringify(state));
+}
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('cutiepet_state'));
+    if (s && typeof s.hp === 'number') {
+      // Resume elapsed time effects
+      processOfflineTime(s);
+      return s;
+    }
+  } catch (e) {}
+  return DEFAULT_STATE();
+}
+
+// ─── Offline Time Processing ──────────────────────────────────
+function processOfflineTime(s) {
+  const now = Date.now();
+  const elapsed = now - (s.lastTick || now);
+  if (elapsed < 60000) return; // less than 1 min, skip
+
+  // Process status duration (sleep/rest/work)
+  if (s.statusEnd && now > s.statusEnd) {
+    // Status already completed offline — apply the effects once for the scheduled duration
+    // (simplified: we apply per-minute ticks)
+  }
+
+  const minutes = Math.floor(elapsed / 60000);
+  const normalTicks = Math.floor(minutes / 15); // metabolism ticks
+
+  for (let i = 0; i < normalTicks; i++) {
+    applyMetabolism(s, false); // false = don't save each tick
+  }
+  // Remaining minutes for hunger=0 or >100 or sick damage
+  const extraMinutes = minutes - normalTicks * 15;
+  for (let i = 0; i < extraMinutes; i++) {
+    applyPerMinuteDamage(s);
+  }
+
+  s.lastTick = now;
+  s.lastSickCheck = now;
+
+  // Finalize completed statuses
+  if (s.statusEnd && now >= s.statusEnd) {
+    s.status = 'idle';
+    s.statusEnd = null;
+  }
+
+  if (s.hp <= 0) { s.hp = 0; s.isDead = true; }
+  capAttributes(s);
+  updateMood(s);
+  saveState();
+}
+
+function applyMetabolism(s) {
+  if (s.status === 'sleeping') {
+    // Sleeping: mood+8, energy+12, hp+5 per hour → per 15min tick
+    s.hunger = (s.hunger || 0) - 3;
+    s.energy = Math.min(100, (s.energy || 0) + 3);
+    s.hp = Math.min(100, (s.hp || 0) + 1.25);
+    updateMood(s);
+  } else if (s.status === 'resting') {
+    s.hunger = (s.hunger || 0) - 3;
+    s.energy = Math.min(100, (s.energy || 0) + 3.75);
+    s.hp = Math.min(100, (s.hp || 0) + 2);
+    updateMood(s);
+  } else if (s.status === 'working') {
+    s.hunger = (s.hunger || 0) - 3;
+    s.energy = Math.max(0, (s.energy || 0) - 2.5);
+    s.coins = (s.coins || 0) + 6.25;
+    updateMood(s);
+  } else if (s.sick) {
+    // Sick metabolism: per 10min tick → every 15min is ~1.5 ticks
+    s.hunger = (s.hunger || 0) - 4;
+    s.energy = Math.max(0, (s.energy || 0) - 4);
+    s.hp = (s.hp || 0) - 0.5;
+    updateMood(s);
+  } else {
+    // Normal metabolism
+    s.hunger = (s.hunger || 0) - 3;
+    s.energy = Math.max(0, (s.energy || 0) - 3);
+    updateMood(s);
+  }
+}
+
+function applyPerMinuteDamage(s) {
+  if (s.sick) s.hp = (s.hp || 0) - 2;
+  else if ((s.hunger || 0) <= 0) s.hp = (s.hp || 0) - 5;
+  else if ((s.hunger || 0) > 100) s.hp = (s.hp || 0) - 5;
+}
+
+function capAttributes(s) {
+  s.energy = Math.max(0, Math.min(100, s.energy));
+  s.hp = Math.max(0, Math.min(100, s.hp));
+  s.coins = Math.max(0, Math.floor(s.coins));
+  if (s.items) {
+    s.items.basic = Math.max(0, s.items.basic);
+    s.items.premium = Math.max(0, s.items.premium);
+    s.items.medicine = Math.max(0, s.items.medicine);
+  }
+  // Mood is set by updateMood
+}
+
+function updateMood(s) {
+  if (s.hp <= 0) { s.mood = 'sad'; return; }
+  // Mood based on conditions
+  if (s.sick || s.hunger <= 10 || s.hunger > 100) s.mood = 'sad';
+  else if (s.hunger >= 40 && s.hunger <= 90 && s.energy >= 30) s.mood = 'happy';
+  else s.mood = 'normal';
+}
+
+// ─── Metabolism Timer ─────────────────────────────────────────
+// TICK_INTERVAL: metabolism tick every 15 min
+// PER_MIN_INTERVAL: per-minute damage check every 1 min
+const TICK_INTERVAL = 15 * 60 * 1000;
+const PER_MIN_INTERVAL = 60 * 1000;
+let lastTickTime = Date.now();
+let lastMinTickTime = Date.now();
+
+setInterval(() => {
+  if (state.isDead) return;
+
+  const now = Date.now();
+
+  // Check if current status has ended
+  if (state.statusEnd && now >= state.statusEnd) {
+    completeStatus();
+  }
+
+  // Normal metabolism tick
+  if (now - lastTickTime >= TICK_INTERVAL) {
+    lastTickTime = now;
+    applyMetabolism(state);
+    capAttributes(state);
+    updateUI();
+    saveState();
+  }
+
+  // Per-minute damage (hunger=0, hunger>100, sick)
+  if (now - lastMinTickTime >= PER_MIN_INTERVAL) {
+    lastMinTickTime = now;
+    if (state.hunger <= 0 || state.hunger > 100 || state.sick) {
+      applyPerMinuteDamage(state);
+      capAttributes(state);
+      if (state.hp <= 0) {
+        state.hp = 0;
+        state.isDead = true;
+        document.getElementById('modal-gameover').classList.add('show');
+      }
+      updateUI();
+      saveState();
+    }
+  }
+
+  // Sick check: every 1 hour, 5% chance
+  if (!state.sick && !state.isDead) {
+    const sickElapsed = now - state.lastSickCheck;
+    if (sickElapsed >= 1 * 60 * 60 * 1000) {
+      state.lastSickCheck = now;
+      if (Math.random() < 0.05) {
+        state.sick = true;
+        updateMood(state);
+        addChat(pick(dialogues.sick));
+        updateUI();
+        saveState();
+      }
+    }
+  }
+
+  // Check death
+  if (state.hp <= 0 && !state.isDead) {
+    state.hp = 0;
+    state.isDead = true;
+    document.getElementById('modal-gameover').classList.add('show');
+    updateUI();
+    saveState();
+  }
+}, 2000);
+
+function completeStatus() {
+  const duration = state.statusEnd - state.lastTick; // approximate
+  const hours = duration / (60 * 60 * 1000);
+
+  if (state.status === 'sleeping') {
+    addChat("睡醒啦～精神满满！😴✨");
+  } else if (state.status === 'resting') {
+    addChat("休息好了～谢谢你主人！☕");
+  } else if (state.status === 'working') {
+    addChat("打工回来啦～赚了辛苦钱！💰");
+  }
+
+  state.status = 'idle';
+  state.statusEnd = null;
+
+  // Restore auto display mode
+  screenDisplayMode = 'auto';
+  screenDisplayEnd = 0;
+}
+
+// ─── Chat System ──────────────────────────────────────────────
+// Pick a random item from array
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// State-based dialogue pools
+const dialogues = {
+  // (一) 饥饿状态
+  hungerStarving: [
+    "饿死就饿死吧，反正也没人在乎…",
+    "算了，饿死拉倒，省得还要麻烦你喂我",
+    "呜呜呜…饿到崩溃了！",
+    "哪位大爷赏口饭吃啊！",
+    "再不吃饭我真的要死给你看。",
+  ],
+  hungerVery: [
+    "没人爱是这样的，我就这样饿死得了…",
+    "饿到没力气吐槽，反正你也不会主动给我吃的",
+    "行，跟了你，我连饭都吃不饱。",
+    "秋刀鱼的滋味，我最了解。",
+  ],
+  hungerNormal: [
+    "只能吃口粮，什么时候可以吃寿司郎啊？",
+    "想吃小炒肉了，你会做吗？",
+    "我爱汉堡包！",
+  ],
+  hungerFull: [
+    "嘿嘿，吃饱啦，别以为我会感谢你",
+    "吃饱放空中…",
+    "宝宝，我饱饱了～",
+    "我觉得我还能再来杯奶茶溜溜缝儿！",
+  ],
+  hungerStuffed: [
+    "你这人什么意思？想撑死我吗？",
+    "完了，肚皮要裂开了…",
+    "不行了，我要撑吐了！",
+    "好撑，好绝望。",
+  ],
+
+  // (二) 心情状态
+  moodHappy: [
+    "别误会，我才不是因为你开心，就是刚好心情好而已",
+    "嘿嘿嘿嘿嘿",
+    "嘻嘻嘻嘻嘻嘻嘻",
+    "咱们老百姓呀，今儿个真高兴！",
+  ],
+  moodNormal: [
+    "人生的意义是什么呢？",
+    "有点无聊了，什么时候带我去游乐场。",
+    "八百标兵奔北坡…",
+    "我不喜，也不悲。",
+  ],
+  moodSad: [
+    "毁灭吧…",
+    "悲伤逆流成河…",
+    "你真的不会陪我玩会儿吗？",
+    "45度仰望天空，你还会记得我吗？",
+  ],
+
+  // (三) 精力状态
+  energyHigh: [
+    "我去打工养你吧！",
+    "精力多到没地方用，陪你玩会儿也不是不行，别太得意",
+    "我感觉自己强得可怕！",
+    "动感猫猫拳！",
+    "喵喵喵喵喵～",
+  ],
+  energyMid: [
+    "想打守望先锋了，我玩猫辅助你吧！",
+    "打工是不可能打工的。",
+    "我大概是需要补充维生素了。",
+    "卧推300公斤选手，不是我。",
+  ],
+  energyLow: [
+    "低精力人群是这样的。",
+    "我才不是需要休息，就是单纯不想动而已",
+    "为什么感觉有点累，哪里出了问题？",
+    "想去公园睡个觉啊。",
+  ],
+  energyEmpty: [
+    "好累…",
+    "心态崩了，我要累晕了。",
+    "再不休息我就变成废猫了喵。",
+  ],
+
+  // (四) 生命值状态
+  hpHigh: [
+    "身体倍儿棒，吃嘛嘛香！",
+    "又是元气满满的一天耶！",
+    "健康生活每一天啊！",
+    "一口气上五层楼不费劲儿！",
+  ],
+  hpMid: [
+    "有点虚，该补点身体了。",
+    "亚健康宠物一枚呀。",
+    "缺啥补啥，给我来口生命一号。",
+    "家人们，你们觉得我健康吗？",
+  ],
+  hpLow: [
+    "快死了…也好，省得再麻烦你，也省得我自己难受",
+    "可恶，这具身体，也撑不住了吗…",
+    "救救我，拉一下。",
+    "救命！SOS！",
+  ],
+
+  // (五) 生病状态
+  sick: [
+    "生病了…",
+    "有药吗，我还有得救。",
+    "我有病，你有药吗？",
+  ],
+
+  // (六) 玩家操作触发
+  feedBasic: ["平平无奇的味道。"],
+  feedPremium: ["我可以每顿都吃这么好吗？"],
+  play: ["嘿嘿，别以为你陪我玩，我就会爱上你。"],
+  rest: ["我去休息会儿，你别把我忘记了。"],
+  sleep: ["睡了，晚安么么哒。"],
+  work: ["到底什么时候才可以不用打工啊…"],
+  medicine: ["谢谢你的药，药，切克闹？"],
+};
+
+// Determine which dialogue pool(s) to draw from based on current state
+// Returns an array of messages, one from each matched pool
+function getAutoDialogues() {
+  const msgs = [];
+
+  // 生病
+  if (state.sick) msgs.push(pick(dialogues.sick));
+
+  // 生命值维度
+  if (state.hp < 10) msgs.push(pick(dialogues.hpLow));
+  else if (state.hp <= 30) msgs.push(pick(dialogues.hpMid));
+  else if (state.hp <= 70) msgs.push(pick(dialogues.hpHigh));
+
+  // 饥饿维度
+  if (state.hunger <= 0) msgs.push(pick(dialogues.hungerStarving));
+  else if (state.hunger > 100) msgs.push(pick(dialogues.hungerStuffed));
+  else if (state.hunger <= 30) msgs.push(pick(dialogues.hungerVery));
+  else if (state.hunger <= 70) msgs.push(pick(dialogues.hungerNormal));
+  else if (state.hunger <= 100) msgs.push(pick(dialogues.hungerFull));
+
+  // 精力维度
+  if (state.energy <= 10) msgs.push(pick(dialogues.energyEmpty));
+  else if (state.energy <= 30) msgs.push(pick(dialogues.energyLow));
+  else if (state.energy <= 70) msgs.push(pick(dialogues.energyMid));
+  else msgs.push(pick(dialogues.energyHigh));
+
+  // 心情维度
+  if (state.mood === 'happy') msgs.push(pick(dialogues.moodHappy));
+  else if (state.mood === 'sad') msgs.push(pick(dialogues.moodSad));
+  else msgs.push(pick(dialogues.moodNormal));
+
+  return msgs;
+}
+
+let chatQueue = [];
+let isTyping = false;
+
+function addChat(msg) {
+  chatQueue.push(msg);
+  if (!isTyping) processChatQueue();
+}
+
+function processChatQueue() {
+  if (chatQueue.length === 0) { isTyping = false; return; }
+  isTyping = true;
+  const msg = chatQueue.shift();
+  typeText(msg, () => processChatQueue());
+}
+
+function typeText(text, onComplete) {
+  const el = document.getElementById('chat-text');
+  const cursor = document.getElementById('chat-cursor');
+  let i = 0;
+  el.textContent = '';
+  cursor.style.display = 'inline-block';
+
+  const interval = setInterval(() => {
+    if (i < text.length) {
+      el.textContent += text[i];
+      i++;
+    } else {
+      clearInterval(interval);
+      cursor.style.display = 'none';
+      setTimeout(() => {
+        if (onComplete) onComplete();
+      }, 2000);
+    }
+  }, 50);
+}
+
+// Auto chat based on state
+setInterval(() => {
+  if (state.isDead || chatQueue.length > 0 || isTyping) return;
+  const msgs = getAutoDialogues();
+  if (msgs.length > 0) msgs.forEach(m => addChat(m));
+}, 5000);
+
+// ─── UI Update ────────────────────────────────────────────────
+function updateUI() {
+  // Mood
+  const moodMap = { happy: '开心', normal: '普通', sad: '难过' };
+  document.getElementById('val-mood').textContent = moodMap[state.mood] || '普通';
+
+  document.getElementById('val-hunger').textContent = Math.floor(state.hunger);
+  document.getElementById('val-energy').textContent = Math.floor(state.energy);
+  document.getElementById('val-hp').textContent = Math.floor(state.hp);
+  document.getElementById('val-coin').textContent = state.coins;
+
+  // Status tag → top-right hint
+  updateStatusHint();
+
+  // Disable buttons when busy or energy too low
+  const busy = state.status !== 'idle' || state.isDead;
+  document.getElementById('btn-play').classList.toggle('disabled', busy || state.energy <= 10);
+  document.getElementById('btn-work').classList.toggle('disabled', busy || state.energy <= 10);
+  document.getElementById('btn-sleep').classList.toggle('disabled', state.isDead);
+  document.getElementById('btn-rest').classList.toggle('disabled', busy || state.isDead);
+  document.getElementById('btn-feed').classList.toggle('disabled', state.isDead);
+  document.getElementById('btn-shop').classList.toggle('disabled', state.isDead);
+}
+
+// ─── Status Hint (top-right) ───────────────────────────────────
+function updateStatusHint() {
+  const el = document.getElementById('status-hint');
+  if (state.isDead) {
+    el.textContent = '💀 已离开';
+  } else if (state.sick) {
+    el.textContent = '🤒 生病中';
+  } else if (state.status === 'sleeping') {
+    const remain = Math.max(0, Math.ceil((state.statusEnd - Date.now()) / 60000));
+    el.textContent = `😴 睡觉中 (${remain}分钟)`;
+  } else if (state.status === 'resting') {
+    const remain = Math.max(0, Math.ceil((state.statusEnd - Date.now()) / 60000));
+    el.textContent = `☕ 休息中 (${remain}分钟)`;
+  } else if (state.status === 'working') {
+    const remain = Math.max(0, Math.ceil((state.statusEnd - Date.now()) / 60000));
+    el.textContent = `💼 打工中 (${remain}分钟)`;
+  } else if (state.hunger <= 10) {
+    el.textContent = '⚠️ 很饿';
+  } else if (state.hunger > 100) {
+    el.textContent = '⚠️ 吃太撑了';
+  } else {
+    el.textContent = '';
+  }
+}
+
+// ─── Actions ──────────────────────────────────────────────────
+// ─── Feed Picker ────────────────────────────────────────────
+window.openFeedPicker = function() {
+  if (state.isDead) return;
+  document.getElementById('feed-count-basic').textContent = `库存：${state.items.basic}`;
+  document.getElementById('feed-count-premium').textContent = `库存：${state.items.premium}`;
+  document.getElementById('btn-feed-basic').disabled = state.items.basic <= 0;
+  document.getElementById('btn-feed-premium').disabled = state.items.premium <= 0;
+  openModal('modal-feed');
+};
+
+window.useFeed = function(type) {
+  if (state.isDead) return;
+  if (state.items[type] <= 0) { showToast("没有这种口粮了！"); return; }
+
+  state.items[type]--;
+  if (type === 'premium') {
+    state.hunger += 40;
+    state.mood = state.mood === 'sad' ? 'normal' : state.mood;
+    updateMood(state);
+    addChat(pick(dialogues.feedPremium));
+    showToast("使用了豪华口粮：饥饿+40，心情提升");
+  } else {
+    state.hunger += 20;
+    updateMood(state);
+    addChat(pick(dialogues.feedBasic));
+    showToast("使用了基础口粮：饥饿+20");
+  }
+  // Show eat animation for 5 seconds
+  screenDisplayMode = 'eat';
+  screenDisplayEnd = Date.now() + 5000;
+  capAttributes(state);
+  closeModal('modal-feed');
+  updateUI();
+  saveState();
+};
+
+window.openPlayModal = function() {
+  if (state.isDead || state.status !== 'idle') return;
+  if (state.energy <= 10) {
+    showToast("精力不足，请休息/睡觉恢复");
+    addChat("太累了…玩不动了…😴");
+    return;
+  }
+  openModal('modal-play');
+};
+
+window.doPlay = function() {
+  if (state.isDead || state.status !== 'idle') return;
+  if (state.energy <= 10) {
+    showToast("精力不足，请休息/睡觉恢复");
+    closeModal('modal-play');
+    return;
+  }
+
+  let moodGain = 30;
+  if (state.mood === 'sad' || state.mood === 'normal') {
+    // mood ≤ 20 equivalent: play gain halved
+    if (state.hunger <= 20) moodGain = 15;
+  }
+
+  state.energy = Math.max(0, state.energy - 15);
+  state.hunger = Math.max(0, state.hunger - 10);
+  updateMood(state);
+  addChat(pick(dialogues.play));
+  showToast(`玩耍：精力-15，饥饿-10`);
+  capAttributes(state);
+  closeModal('modal-play');
+  updateUI();
+  saveState();
+};
+
+// ─── Time Picker ──────────────────────────────────────────────
+window.openTimePicker = function(type) {
+  if (state.isDead) return;
+  if (type === 'work') {
+    if (state.energy <= 10) {
+      showToast("精力不足，请休息/睡觉恢复");
+      return;
+    }
+  }
+  if (state.status !== 'idle') {
+    showToast("正在忙呢，等一下再开始新的活动吧");
+    return;
+  }
+
+  const configs = {
+    sleep: {
+      icon: 'assets/sleep.webp', title: '选择睡觉时长',
+      desc: '每小时：心情+8，精力+12，生命+5',
+      options: [1,2,3,4,6,8,10,12],
+      label: h => h + '小时'
+    },
+    rest: {
+      icon: 'assets/rest.webp', title: '选择休息时长',
+      desc: '每小时：心情+10，精力+15，生命+8',
+      options: [1,2,3],
+      label: h => h + '小时'
+    },
+    work: {
+      icon: 'assets/work.webp', title: '选择打工时长',
+      desc: '每小时：金币+25，精力-10',
+      options: [1,2,3,4,5,6,8,10],
+      label: h => h + '小时'
+    }
+  };
+
+  const cfg = configs[type];
+  if (!cfg) return;
+
+  document.getElementById('time-icon').innerHTML = `<img src="${cfg.icon}">`;
+  document.getElementById('time-title').textContent = cfg.title;
+  document.getElementById('time-desc').textContent = cfg.desc;
+
+  const container = document.getElementById('time-options');
+  container.innerHTML = '';
+  cfg.options.forEach(h => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-time';
+    btn.textContent = cfg.label(h);
+    btn.onclick = () => startTimedAction(type, h);
+    container.appendChild(btn);
+  });
+
+  openModal('modal-time');
+};
+
+function startTimedAction(type, hours) {
+  closeModal('modal-time');
+  state.status = type === 'sleep' ? 'sleeping' : type === 'rest' ? 'resting' : 'working';
+  state.statusEnd = Date.now() + hours * 60 * 60 * 1000;
+
+  // Show action image until status completes
+  screenDisplayMode = type; // 'sleep', 'rest', or 'work'
+  screenDisplayEnd = 0; // no auto-expire, cleared by completeStatus
+
+  if (type === 'sleep') addChat(pick(dialogues.sleep));
+  else if (type === 'rest') addChat(pick(dialogues.rest));
+  else if (type === 'work') addChat(pick(dialogues.work));
+
+  showToast(`${type === 'sleep' ? '睡觉' : type === 'rest' ? '休息' : '打工'}${hours}小时`);
+  updateUI();
+  saveState();
+}
+
+// ─── Settings ──────────────────────────────────────────────────
+window.openSettings = function() {
+  openModal('modal-settings');
+};
+
+// ─── Shop ─────────────────────────────────────────────────────
+window.openShop = function() {
+  if (state.isDead) return;
+  document.getElementById('shop-coin').textContent = state.coins;
+  updateShopButtons();
+  openModal('modal-shop');
+};
+
+function updateShopButtons() {
+  document.getElementById('btn-buy-basic').disabled = state.coins < 10;
+  document.getElementById('btn-buy-premium').disabled = state.coins < 25;
+  document.getElementById('btn-buy-medicine').disabled = state.coins < 50;
+  document.getElementById('shop-coin').textContent = state.coins;
+}
+
+window.buyItem = function(type) {
+  if (state.isDead) return;
+  const prices = { basic: 10, premium: 25, medicine: 50 };
+  if (state.coins < prices[type]) { showToast("金币不够！"); return; }
+
+  state.coins -= prices[type];
+  state.items[type] = (state.items[type] || 0) + 1;
+
+  if (type === 'medicine') {
+    if (state.sick) {
+      state.sick = false;
+      state.hp = Math.min(100, state.hp + 20);
+      updateMood(state);
+      addChat(pick(dialogues.medicine));
+    } else {
+      state.hp = Math.min(100, state.hp + 20);
+      updateMood(state);
+      addChat(pick(dialogues.medicine));
+    }
+    showToast("购买药品：生命+20" + (state.sick ? "，已治愈" : ""));
+  } else if (type === 'premium') {
+    addChat("买到豪华口粮了！好期待！");
+    showToast("购买豪华口粮：消耗25金币");
+  } else {
+    addChat("买口粮啦～是基础款～");
+    showToast("购买基础口粮：消耗10金币");
+  }
+
+  capAttributes(state);
+  updateShopButtons();
+  updateUI();
+  saveState();
+};
+
+// ─── Reset ────────────────────────────────────────────────────
+window.confirmReset = function() {
+  openModal('modal-reset');
+};
+
+window.doReset = function() {
+  closeModal('modal-reset');
+  setTimeout(() => {
+    document.getElementById('modal-bye').classList.add('show');
+    setTimeout(() => {
+      resetGame();
+    }, 2500);
+  }, 300);
+};
+
+window.resetGame = function() {
+  localStorage.removeItem('cutiepet_state');
+  // Full page reload to reset everything
+  setTimeout(() => location.reload(), 300);
+};
+
+// ─── Modal Helpers ────────────────────────────────────────────
+window.openModal = function(id) { document.getElementById(id).classList.add('show'); };
+window.closeModal = function(id) { document.getElementById(id).classList.remove('show'); };
+
+// Close modals on overlay click (except non-dismissible ones)
+document.querySelectorAll('.modal-overlay:not(.modal-noclose)').forEach(el => {
+  el.addEventListener('click', e => {
+    if (e.target === el) el.classList.remove('show');
+  });
+});
+
+// ─── Toast ────────────────────────────────────────────────────
+let toastTimer = null;
+window.showToast = function(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+};
+
+// ─── Init ─────────────────────────────────────────────────────
+updateUI();
+addChat("人生的意义是什么呢？");
+
+</script>
+</body>
+</html>
