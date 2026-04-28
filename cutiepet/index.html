@@ -818,8 +818,9 @@ window.addEventListener('resize', () => {
 
 // ─── Render loop ──────────────────────────────────────────────
 let lastTime = performance.now();
+let animId = null;
 function animate(now) {
-  requestAnimationFrame(animate);
+  animId = requestAnimationFrame(animate);
   const dt = now - lastTime; lastTime = now;
   updateBgGradient(dt);
   drawScreen();
@@ -828,6 +829,16 @@ function animate(now) {
   renderer.render(scene, camera);
 }
 animate(performance.now());
+
+// ─── Pause render when tab is hidden ──────────────────────────
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+  } else {
+    lastTime = performance.now();
+    animate(lastTime);
+  }
+});
 
 // ═══════════════════════════════════════════════════════════════
 //  GAME LOGIC
