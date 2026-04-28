@@ -616,8 +616,8 @@ function getAutoPetImage() {
   if (petImages.full && state.hunger > 100) return 'full';
   if (petImages.die && state.hp < 10) return 'die';
   if (petImages.tired && state.energy < 10) return 'tired';
-  if (petImages.angry && state.mood === 'sad') return 'angry';
-  if (petImages.happy && state.mood === 'happy') return 'happy';
+  if (petImages.angry && moodLabel(state.mood) === 'sad') return 'angry';
+  if (petImages.happy && moodLabel(state.mood) === 'happy') return 'happy';
   return 'normal';
 }
 
@@ -846,7 +846,7 @@ document.addEventListener('visibilitychange', () => {
 
 // ─── Game State ───────────────────────────────────────────────
 const DEFAULT_STATE = () => ({
-  mood: 'normal',       // happy, normal, sad
+  mood: 70,             // 0-100: 0-30难过, 30-70普通, 70-100开心
   hunger: 60,
   energy: 80,
   hp: 100,
@@ -891,14 +891,12 @@ function processOfflineTime(s) {
   }
 
   const minutes = Math.floor(elapsed / 60000);
-  const normalTicks = Math.floor(minutes / 15); // metabolism ticks
 
-  for (let i = 0; i < normalTicks; i++) {
+  for (let i = 0; i < minutes; i++) {
     applyMetabolism(s, false); // false = don't save each tick
   }
-  // Remaining minutes for hunger=0 or >100 or sick damage
-  const extraMinutes = minutes - normalTicks * 15;
-  for (let i = 0; i < extraMinutes; i++) {
+  // Per-minute damage for critical states
+  for (let i = 0; i < minutes; i++) {
     applyPerMinuteDamage(s);
   }
 
@@ -944,6 +942,7 @@ function applyMetabolism(s) {
     // Normal metabolism: per minute -1
     s.hunger = (s.hunger || 0) - 1;
     s.energy = Math.max(0, (s.energy || 0) - 1);
+    s.mood = Math.max(0, (s.mood || 0) - 1);
     updateMood(s);
   }
 }
@@ -956,6 +955,7 @@ function applyPerMinuteDamage(s) {
 
 function capAttributes(s) {
   s.energy = Math.max(0, Math.min(100, s.energy));
+  s.mood = Math.max(0, Math.min(100, s.mood || 0));
   s.hp = Math.max(0, Math.min(100, s.hp));
   s.coins = Math.max(0, Math.floor(s.coins));
   if (s.items) {
@@ -966,12 +966,25 @@ function capAttributes(s) {
   // Mood is set by updateMood
 }
 
+// ─── Mood helpers ──────────────────────────────────────────────
+function moodLabel(val) {
+  if (val >= 70) return 'happy';
+  if (val >= 30) return 'normal';
+  return 'sad';
+}
+function moodText(val) {
+  if (val >= 70) return '开心';
+  if (val >= 30) return '普通';
+  return '难过';
+}
+function capMood(s) {
+  s.mood = Math.max(0, Math.min(100, s.mood || 0));
+}
+
 function updateMood(s) {
-  if (s.hp <= 0) { s.mood = 'sad'; return; }
-  // Mood based on conditions
-  if (s.sick || s.hunger <= 10 || s.hunger > 100) s.mood = 'sad';
-  else if (s.hunger >= 40 && s.hunger <= 90 && s.energy >= 30) s.mood = 'happy';
-  else s.mood = 'normal';
+  if (s.hp <= 0) { s.mood = 0; return; }
+  if (s.sick || s.hunger <= 10 || s.hunger > 100) s.mood = Math.min(s.mood, 20);
+  capMood(s);
 }
 
 // ─── Metabolism Timer ─────────────────────────────────────────
@@ -1210,8 +1223,8 @@ function getAutoDialogues() {
   else msgs.push(pick(dialogues.energyHigh));
 
   // 心情维度
-  if (state.mood === 'happy') msgs.push(pick(dialogues.moodHappy));
-  else if (state.mood === 'sad') msgs.push(pick(dialogues.moodSad));
+  if (moodLabel(state.mood) === 'happy') msgs.push(pick(dialogues.moodHappy));
+  else if (moodLabel(state.mood) === 'sad') msgs.push(pick(dialogues.moodSad));
   else msgs.push(pick(dialogues.moodNormal));
 
   return msgs;
@@ -1263,8 +1276,7 @@ setInterval(() => {
 // ─── UI Update ────────────────────────────────────────────────
 function updateUI() {
   // Mood
-  const moodMap = { happy: '开心', normal: '普通', sad: '难过' };
-  document.getElementById('val-mood').textContent = moodMap[state.mood] || '普通';
+  document.getElementById('val-mood').textContent = moodText(state.mood);
 
   document.getElementById('val-hunger').textContent = Math.floor(state.hunger);
   document.getElementById('val-energy').textContent = Math.floor(state.energy);
@@ -1327,7 +1339,7 @@ window.useFeed = function(type) {
   state.items[type]--;
   if (type === 'premium') {
     state.hunger += 40;
-    state.mood = state.mood === 'sad' ? 'normal' : state.mood;
+    if (state.mood < 30) state.mood = 50;
     updateMood(state);
     addChat(pick(dialogues.feedPremium));
     showToast("使用了豪华口粮：饥饿+40，心情提升");
@@ -1365,7 +1377,7 @@ window.doPlay = function() {
   }
 
   let moodGain = 30;
-  if (state.mood === 'sad' || state.mood === 'normal') {
+  if (moodLabel(state.mood) === 'sad' || moodLabel(state.mood) === 'normal') {
     // mood ≤ 20 equivalent: play gain halved
     if (state.hunger <= 20) moodGain = 15;
   }
