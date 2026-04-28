@@ -941,9 +941,9 @@ function applyMetabolism(s) {
     s.hp = (s.hp || 0) - 0.5;
     updateMood(s);
   } else {
-    // Normal metabolism
-    s.hunger = (s.hunger || 0) - 3;
-    s.energy = Math.max(0, (s.energy || 0) - 3);
+    // Normal metabolism: per minute -1
+    s.hunger = (s.hunger || 0) - 1;
+    s.energy = Math.max(0, (s.energy || 0) - 1);
     updateMood(s);
   }
 }
@@ -975,9 +975,9 @@ function updateMood(s) {
 }
 
 // ─── Metabolism Timer ─────────────────────────────────────────
-// TICK_INTERVAL: metabolism tick every 15 min
+// TICK_INTERVAL: metabolism tick every 1 min (hunger-1, energy-1)
 // PER_MIN_INTERVAL: per-minute damage check every 1 min
-const TICK_INTERVAL = 15 * 60 * 1000;
+const TICK_INTERVAL = 60 * 1000;
 const PER_MIN_INTERVAL = 60 * 1000;
 let lastTickTime = Date.now();
 let lastMinTickTime = Date.now();
