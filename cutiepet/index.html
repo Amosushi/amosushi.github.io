@@ -876,6 +876,14 @@ const DEFAULT_STATE = () => ({
 
 let state = loadState();
 
+// Initialize settledHours based on current status
+if (state.statusEnd && state.status !== 'idle') {
+  const elapsedMs = Date.now() - (state.lastTick || Date.now());
+  settledHours = Math.floor(elapsedMs / (60 * 60 * 1000));
+} else {
+  settledHours = 0;
+}
+
 function saveState() {
   localStorage.setItem('cutiepet_state', JSON.stringify(state));
 }
@@ -898,20 +906,30 @@ function processOfflineTime(s) {
   const elapsed = now - (s.lastTick || now);
   if (elapsed < 60000) return; // less than 1 min, skip
 
-  // Process status duration (sleep/rest/work)
-  if (s.statusEnd && now > s.statusEnd) {
-    // Status already completed offline — apply the effects once for the scheduled duration
-    // (simplified: we apply per-minute ticks)
-  }
-
   const minutes = Math.floor(elapsed / 60000);
+  const offlineHours = Math.floor(elapsed / (60 * 60 * 1000));
 
+  // Apply per-minute metabolism
   for (let i = 0; i < minutes; i++) {
-    applyMetabolism(s, false); // false = don't save each tick
+    applyMetabolism(s, false);
   }
   // Per-minute damage for critical states
   for (let i = 0; i < minutes; i++) {
     applyPerMinuteDamage(s);
+  }
+
+  // Apply hourly settlement for sleep/rest/work
+  if (s.statusEnd && s.status !== 'idle' && offlineHours > 0) {
+    const effects = HOURLY_EFFECTS[s.status];
+    if (effects) {
+      for (let i = 0; i < offlineHours; i++) {
+        if (effects.mood)  s.mood   = Math.min(100, (s.mood || 0)   + effects.mood);
+        if (effects.energy) s.energy = Math.max(0, Math.min(100, (s.energy || 0) + effects.energy));
+        if (effects.hp)    s.hp     = Math.min(100, (s.hp || 0)     + effects.hp);
+        if (effects.coins) s.coins  = (s.coins || 0) + effects.coins;
+        updateMood(s);
+      }
+    }
   }
 
   s.lastTick = now;
@@ -930,20 +948,9 @@ function processOfflineTime(s) {
 }
 
 function applyMetabolism(s) {
-  if (s.status === 'sleeping') {
+  if (s.status === 'sleeping' || s.status === 'resting' || s.status === 'working') {
+    // 睡觉/休息/打工：饥饿按分钟消耗，其余效果按小时整点结算（在 timer 中处理）
     s.hunger = (s.hunger || 0) - 0.2;
-    s.energy = Math.min(100, (s.energy || 0) + 0.3);
-    s.hp = Math.min(100, (s.hp || 0) + 0.12);
-    updateMood(s);
-  } else if (s.status === 'resting') {
-    s.hunger = (s.hunger || 0) - 0.2;
-    s.energy = Math.min(100, (s.energy || 0) + 0.25);
-    s.hp = Math.min(100, (s.hp || 0) + 0.13);
-    updateMood(s);
-  } else if (s.status === 'working') {
-    s.hunger = (s.hunger || 0) - 0.2;
-    s.energy = Math.max(0, (s.energy || 0) - 0.17);
-    s.coins = (s.coins || 0) + 1.67;
     updateMood(s);
   } else if (s.sick) {
     s.hunger = (s.hunger || 0) - 0.27;
@@ -957,6 +964,37 @@ function applyMetabolism(s) {
     s.mood = Math.max(0, (s.mood || 0) - 1);
     updateMood(s);
   }
+}
+
+// ─── Hourly settlement for sleep/rest/work ──────────────────────
+// Track how many full hours have been settled
+let settledHours = 0;
+
+// Hourly effects matching the time-picker modal descriptions
+const HOURLY_EFFECTS = {
+  sleeping: { mood: 8,  energy: 12, hp: 5,  coins: 0  },
+  resting:  { mood: 10, energy: 15, hp: 8,  coins: 0  },
+  working:  { mood: 0,  energy: -10, hp: 0, coins: 25 },
+};
+
+function applyHourlySettlement() {
+  if (!state.statusEnd || state.status === 'idle') return;
+  const elapsedMs = Date.now() - state.lastTick;
+  const newFullHours = Math.floor(elapsedMs / (60 * 60 * 1000));
+  if (newFullHours <= settledHours) return;
+
+  const hoursToSettle = newFullHours - settledHours;
+  const effects = HOURLY_EFFECTS[state.status];
+  if (!effects) return;
+
+  for (let i = 0; i < hoursToSettle; i++) {
+    if (effects.mood)  state.mood   = Math.min(100, (state.mood || 0)   + effects.mood);
+    if (effects.energy) state.energy = Math.max(0, Math.min(100, (state.energy || 0) + effects.energy));
+    if (effects.hp)    state.hp     = Math.min(100, (state.hp || 0)     + effects.hp);
+    if (effects.coins) state.coins  = (state.coins || 0) + effects.coins;
+    updateMood(state);
+  }
+  settledHours = newFullHours;
 }
 
 function applyPerMinuteDamage(s) {
@@ -1014,7 +1052,15 @@ setInterval(() => {
 
   // Check if current status has ended
   if (state.statusEnd && now >= state.statusEnd) {
+    // Apply final hourly settlement before completing
+    applyHourlySettlement();
     completeStatus();
+    settledHours = 0;
+  }
+
+  // Hourly settlement for sleep/rest/work
+  if (state.statusEnd && state.status !== 'idle') {
+    applyHourlySettlement();
   }
 
   // Normal metabolism tick
@@ -1089,7 +1135,7 @@ function completeStatus() {
 
 // ─── Stop Action ──────────────────────────────────────────────
 const statusLabels = { sleeping: '睡觉', resting: '休息', working: '打工' };
-const COINS_PER_HOUR = 100;
+const COINS_PER_HOUR = 25;
 
 window.openStopConfirm = function() {
   if (state.status === 'idle') return;
@@ -1122,12 +1168,14 @@ window.openStopConfirm = function() {
 window.doStop = function() {
   closeModal('modal-stop');
 
+  // Apply any pending hourly settlement first
+  applyHourlySettlement();
+
   const elapsed = Date.now() - state.lastTick;
   const elapsedMin = Math.max(0, Math.floor(elapsed / 60000));
   const completedHours = Math.floor(elapsedMin / 60);
   const label = statusLabels[state.status] || '';
 
-  // 补算报酬（仅打工）
   if (state.status === 'working' && completedHours > 0) {
     const coinsEarned = completedHours * COINS_PER_HOUR;
     state.coins = (state.coins || 0) + coinsEarned;
@@ -1142,6 +1190,7 @@ window.doStop = function() {
   state.statusEnd = null;
   screenDisplayMode = 'auto';
   screenDisplayEnd = 0;
+  settledHours = 0;
 
   updateUI();
   saveState();
@@ -1527,6 +1576,7 @@ function startTimedAction(type, hours) {
   state.status = type === 'sleep' ? 'sleeping' : type === 'rest' ? 'resting' : 'working';
   state.statusEnd = Date.now() + hours * 60 * 60 * 1000;
   state.lastTick = Date.now();
+  settledHours = 0;
 
   // Show action image until status completes
   screenDisplayMode = type; // 'sleep', 'rest', or 'work'
