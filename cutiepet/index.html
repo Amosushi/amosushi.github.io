@@ -858,6 +858,13 @@ document.addEventListener('visibilitychange', () => {
 //  GAME LOGIC
 // ═══════════════════════════════════════════════════════════════
 
+// ─── Hourly effects matching the time-picker modal descriptions ─
+const HOURLY_EFFECTS = {
+  sleeping: { mood: 8,  energy: 12, hp: 5,  coins: 0  },
+  resting:  { mood: 10, energy: 15, hp: 8,  coins: 0  },
+  working:  { mood: 0,  energy: -10, hp: 0, coins: 25 },
+};
+
 // ─── Game State ───────────────────────────────────────────────
 const DEFAULT_STATE = () => ({
   mood: 70,             // 0-100: 0-30难过, 30-70普通, 70-100开心
@@ -969,13 +976,6 @@ function applyMetabolism(s) {
 // ─── Hourly settlement for sleep/rest/work ──────────────────────
 // Track how many full hours have been settled
 let settledHours = 0;
-
-// Hourly effects matching the time-picker modal descriptions
-const HOURLY_EFFECTS = {
-  sleeping: { mood: 8,  energy: 12, hp: 5,  coins: 0  },
-  resting:  { mood: 10, energy: 15, hp: 8,  coins: 0  },
-  working:  { mood: 0,  energy: -10, hp: 0, coins: 25 },
-};
 
 function applyHourlySettlement() {
   if (!state.statusEnd || state.status === 'idle') return;
