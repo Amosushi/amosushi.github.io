@@ -345,12 +345,26 @@
     <button class="btn-action" id="btn-sleep" onclick="openTimePicker('sleep')"><img src="assets/sleep.webp" class="btn-icon">睡觉</button>
     <button class="btn-action" id="btn-rest" onclick="openTimePicker('rest')"><img src="assets/rest.webp" class="btn-icon">休息</button>
     <button class="btn-action" id="btn-work" onclick="openTimePicker('work')"><img src="assets/work.webp" class="btn-icon">打工</button>
+    <button class="btn-action" id="btn-stop" onclick="openStopConfirm()" style="display:none;"><img src="assets/why.webp" class="btn-icon">停止</button>
     <button class="btn-action" id="btn-shop" onclick="openShop()"><img src="assets/shop.webp" class="btn-icon">商店</button>
     <button class="btn-action" id="btn-settings" onclick="openSettings()"><img src="assets/setting.webp" class="btn-icon">设置</button>
   </div>
 </div>
 
 <!-- ── Modals ── -->
+<!-- Stop Confirm -->
+<div class="modal-overlay" id="modal-stop">
+  <div class="modal">
+    <div class="modal-icon"><img src="assets/why.webp"></div>
+    <div class="modal-title" id="stop-title">确定要停止吗？</div>
+    <div class="modal-desc" id="stop-desc">提前结束只能按已完成的小时结算报酬哦</div>
+    <div class="modal-btns">
+      <button class="btn-modal btn-modal-ghost" onclick="closeModal('modal-stop')">继续</button>
+      <button class="btn-modal btn-modal-primary" onclick="doStop()">确认停止</button>
+    </div>
+  </div>
+</div>
+
 <!-- Reset Confirm -->
 <div class="modal-overlay" id="modal-reset">
   <div class="modal">
@@ -917,26 +931,24 @@ function processOfflineTime(s) {
 
 function applyMetabolism(s) {
   if (s.status === 'sleeping') {
-    // Sleeping: mood+8, energy+12, hp+5 per hour → per 15min tick
-    s.hunger = (s.hunger || 0) - 3;
-    s.energy = Math.min(100, (s.energy || 0) + 3);
-    s.hp = Math.min(100, (s.hp || 0) + 1.25);
+    s.hunger = (s.hunger || 0) - 0.2;
+    s.energy = Math.min(100, (s.energy || 0) + 0.3);
+    s.hp = Math.min(100, (s.hp || 0) + 0.12);
     updateMood(s);
   } else if (s.status === 'resting') {
-    s.hunger = (s.hunger || 0) - 3;
-    s.energy = Math.min(100, (s.energy || 0) + 3.75);
-    s.hp = Math.min(100, (s.hp || 0) + 2);
+    s.hunger = (s.hunger || 0) - 0.2;
+    s.energy = Math.min(100, (s.energy || 0) + 0.25);
+    s.hp = Math.min(100, (s.hp || 0) + 0.13);
     updateMood(s);
   } else if (s.status === 'working') {
-    s.hunger = (s.hunger || 0) - 3;
-    s.energy = Math.max(0, (s.energy || 0) - 2.5);
-    s.coins = (s.coins || 0) + 6.25;
+    s.hunger = (s.hunger || 0) - 0.2;
+    s.energy = Math.max(0, (s.energy || 0) - 0.17);
+    s.coins = (s.coins || 0) + 1.67;
     updateMood(s);
   } else if (s.sick) {
-    // Sick metabolism: per 10min tick → every 15min is ~1.5 ticks
-    s.hunger = (s.hunger || 0) - 4;
-    s.energy = Math.max(0, (s.energy || 0) - 4);
-    s.hp = (s.hp || 0) - 0.5;
+    s.hunger = (s.hunger || 0) - 0.27;
+    s.energy = Math.max(0, (s.energy || 0) - 0.27);
+    s.hp = (s.hp || 0) - 0.03;
     updateMood(s);
   } else {
     // Normal metabolism: per minute -1
@@ -1074,6 +1086,66 @@ function completeStatus() {
   screenDisplayMode = 'auto';
   screenDisplayEnd = 0;
 }
+
+// ─── Stop Action ──────────────────────────────────────────────
+const statusLabels = { sleeping: '睡觉', resting: '休息', working: '打工' };
+const COINS_PER_HOUR = 100;
+
+window.openStopConfirm = function() {
+  if (state.status === 'idle') return;
+
+  const label = statusLabels[state.status] || '';
+  const elapsed = Date.now() - state.lastTick;
+  const elapsedMin = Math.max(0, Math.floor(elapsed / 60000));
+  const completedHours = Math.floor(elapsedMin / 60);
+
+  const titleEl = document.getElementById('stop-title');
+  const descEl = document.getElementById('stop-desc');
+
+  titleEl.textContent = `确定要停止${label}吗？`;
+
+  if (state.status === 'working') {
+    if (completedHours > 0) {
+      descEl.textContent = `已${label} ${elapsedMin} 分钟，按${completedHours}小时结算，获得 ${completedHours * COINS_PER_HOUR} 金币`;
+    } else {
+      descEl.textContent = `已${label}不到1小时，提前结束无法获得报酬哦`;
+    }
+  } else {
+    const h = Math.floor(elapsedMin / 60);
+    const m = elapsedMin % 60;
+    descEl.textContent = `已${label} ${h}小时${m}分钟，效果会按实际时间结算`;
+  }
+
+  openModal('modal-stop');
+};
+
+window.doStop = function() {
+  closeModal('modal-stop');
+
+  const elapsed = Date.now() - state.lastTick;
+  const elapsedMin = Math.max(0, Math.floor(elapsed / 60000));
+  const completedHours = Math.floor(elapsedMin / 60);
+  const label = statusLabels[state.status] || '';
+
+  // 补算报酬（仅打工）
+  if (state.status === 'working' && completedHours > 0) {
+    const coinsEarned = completedHours * COINS_PER_HOUR;
+    state.coins = (state.coins || 0) + coinsEarned;
+    addChat(`提前结束打工～${completedHours}小时获得 ${coinsEarned} 金币！💰`);
+  } else if (state.status === 'sleeping') {
+    addChat(`提前起床了～休息了一会～😴`);
+  } else if (state.status === 'resting') {
+    addChat(`不休息了～谢谢你主人！☕`);
+  }
+
+  state.status = 'idle';
+  state.statusEnd = null;
+  screenDisplayMode = 'auto';
+  screenDisplayEnd = 0;
+
+  updateUI();
+  saveState();
+};
 
 // ─── Chat System ──────────────────────────────────────────────
 // Pick a random item from array
@@ -1288,12 +1360,14 @@ function updateUI() {
 
   // Disable buttons when busy or energy too low
   const busy = state.status !== 'idle' || state.isDead;
+  const isActive = state.status !== 'idle' && !state.isDead;
   document.getElementById('btn-play').classList.toggle('disabled', busy || state.energy <= 10);
   document.getElementById('btn-work').classList.toggle('disabled', busy || state.energy <= 10);
   document.getElementById('btn-sleep').classList.toggle('disabled', state.isDead);
   document.getElementById('btn-rest').classList.toggle('disabled', busy || state.isDead);
   document.getElementById('btn-feed').classList.toggle('disabled', state.isDead);
   document.getElementById('btn-shop').classList.toggle('disabled', state.isDead);
+  document.getElementById('btn-stop').style.display = isActive ? '' : 'none';
 }
 
 // ─── Status Hint (top-right) ───────────────────────────────────
@@ -1452,6 +1526,7 @@ function startTimedAction(type, hours) {
   closeModal('modal-time');
   state.status = type === 'sleep' ? 'sleeping' : type === 'rest' ? 'resting' : 'working';
   state.statusEnd = Date.now() + hours * 60 * 60 * 1000;
+  state.lastTick = Date.now();
 
   // Show action image until status completes
   screenDisplayMode = type; // 'sleep', 'rest', or 'work'
