@@ -1,349 +1,1658 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jiho's Lab</title>
-    <link rel="icon" href="favicon.png" type="image/png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Jiho's Lab</title>
+<link rel="icon" href="favicon.png" type="image/png">
+<style>
+  @font-face {
+    font-family: 'FLYNN Mono';
+    src: url('Flynnmono.ttf') format('truetype');
+    font-display: swap;
+  }
+  * { box-sizing: border-box; }
+  /* Chakra UI mono 字体栈（截图里 DevTools 的 --chakra-fonts-mono） */
+  :root {
+    --mono: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    --a2: #f0f0ee;               /* 白色线框 UI */
+    --a2-dim: rgba(240,240,238,.5);
+  }
+  html, body { margin:0; padding:0; width:100%; height:100%; background:#000; overflow:hidden; touch-action:none; overscroll-behavior:none; }
+  body { color:#eee; font-family:var(--mono); }
+  #c { display:block; position:fixed; inset:0; z-index:0; }
 
-    <!-- Import maps polyfill (鼠标效果用) -->
-    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.js"
-            }
-        }
-    </script>
+  /* ===== 顶栏：左上 Logo + 右上 Tab ===== */
+  .navbar {
+    position: fixed; top:0; left:0; width:100%; z-index:100;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:20px 48px;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-bottom:none;
+  }
+  .nav-logo { display:flex; align-items:center; text-decoration:none; flex-shrink:0; }
+  .logo-img { height:18px; width:auto; object-fit:contain; }
+  .nav-links { display:flex; align-items:center; gap:40px; list-style:none; margin:0; padding:0; }
+  .nav-links a {
+    text-decoration:none; font-family:var(--mono);
+    font-size:13px; font-weight:400; color:rgba(255,255,255,0.9);
+    letter-spacing:2px; position:relative; cursor:pointer;
+    transition: color 0.25s ease;
+  }
+  .nav-links a::after {
+    content:''; position:absolute; bottom:-4px; left:0;
+    width:0; height:1px; background:#fff; transition:width 0.3s ease;
+  }
+  .nav-links a:hover { color:#fff; }
+  .nav-links a:hover::after { width:100%; }
+  .nav-links a.active { color:#fff; }
+  .nav-links a.active::after { width:100%; }
+  /* Apple：顶栏透明，Logo 和 Tab 改白色 */
+  body.apple-mode .navbar {
+    background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none;
+  }
+  body.apple-mode .logo-img { filter:brightness(0) invert(1); }
+  body.apple-mode .nav-links a { color:#ffffff; }
+  body.apple-mode .nav-links a::after { background:#ffffff; }
+  body.apple-mode .nav-links a:hover,
+  body.apple-mode .nav-links a.active { color:#ffffff; }
 
-    <link rel="stylesheet" href="style.css">
-</head>
-<body class="homepage">
+  /* ===== 左侧乱码文本区域（ScrambleText）===== */
+  .scramble-area {
+    position:fixed; top:50%; left:clamp(36px,7vw,110px); transform:translateY(-50%);
+    width:min(40vw,500px); z-index:10; pointer-events:auto;
+  }
+  .scrambled-text {
+    font-family:var(--mono); font-weight:400;
+    font-size:clamp(15px,1.5vw,21px); line-height:1.6;
+    color:#ffffff; letter-spacing:0.01em;
+  }
+  /* 第一行 32px 单独成行 + 下方空一行间距 */
+  .sc-first { font-size:clamp(22px,2.6vw,32px); font-weight:600; display:block; margin-bottom:1.6em; }
+  /* 单词容器：nowrap 防止单词被从中间截断 */
+  .sc-word { display:inline-block; white-space:nowrap; }
+  /* 每个字符 span：用隐藏的 sizer 撑宽度，glyph 绝对定位居中（复刻组件结构）*/
+  .sc-char { position:relative; display:inline-block; white-space:pre; }
+  .sc-sizer { visibility:hidden; }
+  .sc-glyph { position:absolute; top:0; left:0; white-space:pre; will-change:transform,filter,opacity; }
+  .sc-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
 
-    <!-- ========== Loading 遮罩 ========== -->
-    <div id="loading-screen">
-        <div class="loading-box">
-            <div class="loading-text">
-                <span id="loading-percent">0</span><span class="loading-cursor">_</span>
-            </div>
-        </div>
-    </div>
+  /* ===== 屏幕 Enter 点击热区（完全透明，视觉由 CRT shader 绘制）===== */
+  #enterBtn {
+    position:fixed; z-index:20; display:none;
+    cursor:pointer; user-select:none;
+    transform:translate(-50%,-50%);
+    border:none; background:transparent; padding:0; margin:0;
+    color:transparent; outline:none;
+    -webkit-appearance:none; appearance:none;
+  }
 
-    <!-- ========== 背景视频 ========== -->
-    <video class="bg-video" autoplay muted loop playsinline>
-        <source src="bg.mp4" type="video/mp4">
-    </video>
+  /* ===== 切换瞬间的极淡遮罩（不是白闪）===== */
+  #zoomOverlay {
+    position:fixed; inset:0; z-index:500; pointer-events:none;
+    background:#000; opacity:0;
+  }
 
-    <!-- ========== 导航栏 ========== -->
-    <nav class="navbar">
-        <a href="index.html" class="nav-logo">
-            <img src="Logo.webp" alt="Logo" class="logo-img">
-        </a>
-        <ul class="nav-links">
-            <li><a href="works.html" id="nav-works">Works</a></li>
-            <li><a href="about.html">AboutMe</a></li>
-        </ul>
-    </nav>
+  #label { position:fixed; top:70px; left:12px; z-index:10; font-size:11px; background:rgba(0,0,0,0.5); padding:6px 10px; border-radius:6px; pointer-events:none; }
+  #err { position:fixed; bottom:12px; left:12px; z-index:10; color:#f88; font-size:12px; max-width:60vw; }
+  /* 调参面板已停用，完全隐藏（含 ?debug=1）*/
+  .lil-gui { display:none !important; }
 
-    <!-- 圆形过渡动画层 -->
-    <div id="transition-overlay"></div>
+  /* 调参面板里额外加的动画参数容器占位 */
+  #exportBox { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:30; display:none; background:#111; border:1px solid #444; padding:10px; border-radius:8px; max-width:70vw; }
+  #exportBox textarea { width:100%; height:70px; background:#000; color:#8f8; border:1px solid #333; font-size:11px; font-family:'FLYNN Mono',monospace; }
+  #exportBox button { margin-top:6px; font-family:'FLYNN Mono',monospace; }
 
-    <!-- ========== 背景音乐 ========== -->
-    <audio id="bg-music" src="keyboardSound.mp3" loop preload="auto"></audio>
-
-    <!-- 静音切换按钮 -->
-    <button id="mute-btn" class="mute-btn" title="Toggle sound">
-        <svg id="icon-sound" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-        </svg>
-        <svg id="icon-mute" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-            <line x1="23" y1="9" x2="17" y2="15"/>
-            <line x1="17" y1="9" x2="23" y2="15"/>
-        </svg>
-    </button>
-
-    <!-- ========== 鼠标效果相关 DOM ========== -->
-    <div id="loading" style="display:none;"></div>
-    <!-- WebGL Canvas（鼠标效果渲染层） -->
-    <canvas id="webgl-canvas"></canvas>
-
-    <!-- ========== 主标题 ========== -->
-    <div class="hero-title-wrapper">
-        <h1 class="hero-title">
-            <span id="typewriter-text"></span><span class="typewriter-cursor">|</span>
-        </h1>
-    </div>
-
-    <!-- 鼠标效果 JS（ES Module，仅桌面端） -->
-    <script type="module">
-        const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768;
-        if (!isMobile) {
-            const s = document.createElement('script');
-            s.type = 'module';
-            s.src = 'mouse-effect.js';
-            document.body.appendChild(s);
-        } else {
-            // 手机端隐藏 webgl canvas
-            const c = document.getElementById('webgl-canvas');
-            if (c) c.style.display = 'none';
-        }
-    </script>
-
-    <!-- 打字机效果 -->
-    <script>
-        (function () {
-            const phrases = ["I'm a Designer", "You can call me Jiho"];
-            let phraseIndex = 0;
-            let charIndex = 0;
-            let isDeleting = false;
-
-            const el = document.getElementById('typewriter-text');
-
-            // 配置（毫秒）
-            const TYPE_SPEED   = 90;   // 打字速度
-            const DELETE_SPEED = 45;   // 删字速度（快速）
-            const PAUSE_AFTER  = 2200; // 打完后停顿
-            const PAUSE_BEFORE = 300;  // 删完后停顿
-
-            function tick() {
-                const current = phrases[phraseIndex];
-
-                if (!isDeleting) {
-                    // 正在打字
-                    charIndex++;
-                    el.textContent = current.slice(0, charIndex);
-
-                    if (charIndex === current.length) {
-                        // 打完，停顿后开始删
-                        isDeleting = true;
-                        setTimeout(tick, PAUSE_AFTER);
-                        return;
-                    }
-                    setTimeout(tick, TYPE_SPEED);
-                } else {
-                    // 正在删字
-                    charIndex--;
-                    el.textContent = current.slice(0, charIndex);
-
-                    if (charIndex === 0) {
-                        // 删完，切换到下一句
-                        isDeleting = false;
-                        phraseIndex = (phraseIndex + 1) % phrases.length;
-                        setTimeout(tick, PAUSE_BEFORE);
-                        return;
-                    }
-                    setTimeout(tick, DELETE_SPEED);
-                }
-            }
-
-            // 页面加载后短暂延迟再开始
-            setTimeout(tick, 800);
-        })();
-    </script>
-    <!-- 背景音乐控制 -->
-    <script>
-        (function () {
-            const music   = document.getElementById('bg-music');
-            const btn     = document.getElementById('mute-btn');
-            const iconOn  = document.getElementById('icon-sound');
-            const iconOff = document.getElementById('icon-mute');
-
-            music.volume = 0.35;
-            let playing = false;
-
-            function tryPlay() {
-                if (playing) return;
-                music.play().then(() => { playing = true; }).catch(() => {});
-            }
-
-            // 第一次任意交互后自动播放（绕过浏览器限制）
-            ['click', 'keydown', 'touchstart', 'mousemove'].forEach(evt => {
-                document.addEventListener(evt, tryPlay, { once: true });
-            });
-
-            // 静音切换
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (music.paused) {
-                    music.play().then(() => { playing = true; });
-                    iconOn.style.display  = '';
-                    iconOff.style.display = 'none';
-                } else {
-                    music.pause();
-                    iconOn.style.display  = 'none';
-                    iconOff.style.display = '';
-                }
-            });
-        })();
-    </script>
-
-    <!-- 视差视频效果（仅桌面端） -->
-    <script>
-        (function () {
-            // 触控设备或窄屏不启用视差
-            const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768;
-            if (isMobile) return;
-
-            const video = document.querySelector('.bg-video');
-            // 最大偏移像素（水平/垂直）
-            const MAX_X = 18;
-            const MAX_Y = 10;
-            // 平滑系数（越小越慢越丝滑）
-            const EASE = 0.06;
-
-            let targetX = 0, targetY = 0;
-            let currentX = 0, currentY = 0;
-
-            // 让视频稍微大于视口，才有移动空间
-            video.style.width  = (100 + MAX_X * 2 / window.innerWidth  * 100) + 'vw';
-            video.style.height = (100 + MAX_Y * 2 / window.innerHeight * 100) + 'vh';
-            video.style.left   = (-MAX_X) + 'px';
-            video.style.top    = (-MAX_Y) + 'px';
-
-            window.addEventListener('mousemove', (e) => {
-                // 归一化到 -1 ~ 1
-                const nx = (e.clientX / window.innerWidth  - 0.5) * 2;
-                const ny = (e.clientY / window.innerHeight - 0.5) * 2;
-                // 鼠标往右 → 视频往左（反向）
-                targetX = -nx * MAX_X;
-                targetY = -ny * MAX_Y;
-            });
-
-            (function loop() {
-                currentX += (targetX - currentX) * EASE;
-                currentY += (targetY - currentY) * EASE;
-                video.style.transform = `translate(${currentX}px, ${currentY}px)`;
-                requestAnimationFrame(loop);
-            })();
-        })();
-    </script>
-
-    <!-- Works 圆形展开过渡（纯 CSS，不截帧，无卡顿） -->
-    <script>
-        (function () {
-            // 电脑屏幕在视频 2560×1440 中的圆心位置（百分比）
-            const CX = '56.6%';  // 1449/2560（X1366+83 的中心）
-            const CY = '39.0%';  // 561/1440
-            const START_R = '3px';
-
-            function startTransition(e) {
-                e.preventDefault();
-                const targetHref = e.currentTarget.href;
-
-                const overlay = document.getElementById('transition-overlay');
-                if (!overlay) return;
-
-                // 立即显示黑幕，从屏幕位置的小圆开始
-                const maxR = Math.max(window.innerWidth, window.innerHeight) * 1.6;
-                overlay.style.cssText = `
-                    position:fixed; top:0; left:0;
-                    width:100vw; height:100vh;
-                    background:#000;
-                    z-index:999;
-                    clip-path: circle(${START_R} at ${CX} ${CY});
-                `;
-
-                // 下一帧启动动画：展开到全屏
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        overlay.style.transition = 'clip-path 0.35s cubic-bezier(0.4,0,0.2,1)';
-                        overlay.style.clipPath = `circle(${maxR}px at ${CX} ${CY})`;
-                    });
-                });
-
-                // 动画结束前提前跳转，视觉无感知
-                setTimeout(() => { window.location.href = targetHref; }, 350);
-            }
-
-            const worksLink = document.getElementById('nav-works');
-            if (worksLink) worksLink.addEventListener('click', startTransition);
-        })();
-    </script>
-
-</body>
-
-<!-- ========== 预加载脚本 ========== -->
-<script>
-(function() {
-    const loadingScreen = document.getElementById('loading-screen');
-    const percentEl = document.getElementById('loading-percent');
-
-    // 只预加载首页必须资源（其他页面资源在跳转时再加载）
-    const resources = [
-        // 首页必须
-        'Logo.png',
-        'Flynnmono.ttf',
-        'keyboardSound.mp3'
-    ];
-
-    let loaded = 0;
-    const total = resources.length + 1; // +1 是视频
-    let finished = false;
-
-    function finishLoading() {
-        if (finished) return;
-        finished = true;
-        percentEl.textContent = '100%...';
-        setTimeout(() => {
-            loadingScreen.classList.add('fade-out');
-            setTimeout(() => {
-                loadingScreen.style.display = 'none';
-            }, 600);
-        }, 200);
-    }
-
-    function updateProgress() {
-        if (finished) return;
-        loaded++;
-        const pct = Math.round((loaded / total) * 100);
-        percentEl.textContent = pct + '%...';
-        if (loaded >= total) finishLoading();
-    }
-
-    // 超时保护：最多等 6 秒，不管加载完没完都进入页面
-    setTimeout(finishLoading, 6000);
-
-    // 图片预加载
-    resources.forEach(src => {
-        if (src.endsWith('.png') || src.endsWith('.jpg') || src.endsWith('.jpeg') || src.endsWith('.gif') || src.endsWith('.webp')) {
-            const img = new Image();
-            img.onload = updateProgress;
-            img.onerror = updateProgress;
-            img.src = src;
-        } else if (src.endsWith('.mp3') || src.endsWith('.wav') || src.endsWith('.ogg')) {
-            const audio = new Audio();
-            audio.oncanplaythrough = updateProgress;
-            audio.onerror = updateProgress;
-            audio.preload = 'auto';
-            audio.src = src;
-        } else if (src.endsWith('.ttf') || src.endsWith('.woff') || src.endsWith('.woff2')) {
-            setTimeout(updateProgress, 500);
-        }
-    });
-
-    // 视频预加载 — 兼容 Safari/移动端
-    const video = document.querySelector('.bg-video');
-    if (video) {
-        // Safari/移动端：canplay 可能不触发，加多重保护
-        video.oncanplay = updateProgress;
-        video.onerror = updateProgress;
-        video.onloadeddata = updateProgress;  // 额外监听 loadeddata
-        video.load();
-        // 如果视频已经有足够数据（缓存），直接触发
-        if (video.readyState >= 3) updateProgress();
-    } else {
-        updateProgress();
-    }
-
-    // 字体加载检测
-    document.fonts.ready.then(() => {
-        setTimeout(updateProgress, 300);
-    });
-})();
+  /* ===== About Me 弹层 ===== */
+  .about-overlay {
+    position:fixed; inset:0; z-index:200; display:none;
+    background:rgba(245,243,238,0.72);
+    backdrop-filter:blur(0px) saturate(1); -webkit-backdrop-filter:blur(0px) saturate(1);
+    opacity:0; transition:opacity .55s ease,backdrop-filter .6s ease,-webkit-backdrop-filter .6s ease;
+  }
+  .about-overlay.open { display:block; }
+  .about-overlay.show { opacity:1; backdrop-filter:blur(22px) saturate(1.1); -webkit-backdrop-filter:blur(22px) saturate(1.1); }
+  .about-close {
+    position:absolute; top:26px; right:38px; z-index:5;
+    width:44px; height:44px; border-radius:50%; border:1px solid rgba(20,18,15,.35);
+    background:transparent; color:#1a1815; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .25s,color .25s,transform .35s;
+  }
+  .about-close svg { width:19px; height:19px; }
+  .about-close:hover { background:#1a1815; color:#fff; transform:rotate(90deg); }
+  .about-inner {
+    position:absolute; inset:0; display:flex; align-items:stretch;
+    gap:clamp(20px,4vw,70px); padding:0 clamp(40px,7vw,120px);
+  }
+  .about-left { flex:0 0 48%; height:100%; min-height:0; display:flex; align-items:center; justify-content:center;
+    transition:transform .42s cubic-bezier(.4,0,.6,1),opacity .38s ease; }
+  .about-left .lanyard-canvas { width:100%; height:100%; display:block; }
+  .about-right { flex:1 1 auto; min-width:0; max-height:100%; overflow-y:auto; color:#1a1815;
+    padding:clamp(40px,7vh,90px) 12px clamp(40px,7vh,90px) 0;
+    display:flex; flex-direction:column; justify-content:center;
+    transition:opacity .32s ease,transform .42s cubic-bezier(.4,0,.6,1); }
+  /* 关闭动效（分阶段串行）：① 名片上收 ② 文字收起渐隐 ③ 背景最后恢复 */
+  .about-left { transition:transform .55s cubic-bezier(.5,0,.2,1),opacity .5s ease; }
+  .about-overlay.closing-card .about-left { transform:translateY(-120px) scale(.8); opacity:0; }
+  .about-right { transition:opacity .5s ease,transform .55s cubic-bezier(.5,0,.2,1); }
+  .about-overlay.closing-text .about-right { transform:translateY(-24px) scale(.97); opacity:0; }
+  .about-overlay.closing-text .about-close { opacity:0; transition:opacity .3s; }
+  .about-right::-webkit-scrollbar { width:5px; }
+  .about-right::-webkit-scrollbar-thumb { background:rgba(0,0,0,.2); border-radius:3px; }
+  /* 右侧文字逐步渐现 */
+  @keyframes aboutReveal { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+  .about-overlay.show .about-name,
+  .about-overlay.show .about-tags,
+  .about-overlay.show .tl-item,
+  .about-overlay.show .contact-row {
+    opacity:0; animation:aboutReveal .7s cubic-bezier(.22,.61,.36,1) forwards;
+  }
+  .about-overlay.show .about-name { animation-delay:.15s; }
+  .about-overlay.show .about-tags { animation-delay:.3s; }
+  .about-overlay.show .tl-item:nth-child(1) { animation-delay:.45s; }
+  .about-overlay.show .tl-item:nth-child(2) { animation-delay:.6s; }
+  .about-overlay.show .tl-item:nth-child(3) { animation-delay:.75s; }
+  .about-overlay.show .contact-row:nth-child(1) { animation-delay:.9s; }
+  .about-overlay.show .contact-row:nth-child(2) { animation-delay:1.02s; }
+  .about-name { font-size:clamp(34px,4.2vw,58px); font-weight:700; margin:0 0 18px; letter-spacing:.05em; }
+  .about-tags { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+  .about-tags span {
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:13px; line-height:1; padding:7px 14px; border:1px solid rgba(26,24,21,.35); border-radius:20px;
+    letter-spacing:.02em;
+  }
+  .about-timeline { position:relative; padding-left:20px; margin-bottom:22px; }
+  /* 竖线：细、从第一个点延伸到最后一个点 */
+  .about-timeline::before {
+    content:''; position:absolute; left:3px; top:7px; bottom:12px;
+    width:1px; background:rgba(26,24,21,.28);
+  }
+  .tl-item { position:relative; margin-bottom:16px; }
+  /* 圆点：小巧、完整、精确落在细线上（线中心 x=3.5，点 6px → left=-19.5px） */
+  .tl-item::before {
+    content:''; position:absolute; left:-19.5px; top:5px; width:6px; height:6px;
+    border-radius:50%; background:#1a1815;
+  }
+  .tl-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; margin-bottom:8px; }
+  .tl-date { font-size:13px; color:#6a655c; letter-spacing:.03em; }
+  .tl-org { font-size:18px; font-weight:700; }
+  .tl-role { font-size:14px; color:#4a463e; }
+  .tl-item p { font-size:13.5px; line-height:1.6; margin:3px 0; color:#33302a; }
+  .about-contact { display:flex; flex-direction:column; gap:12px; }
+  .contact-row { display:flex; align-items:center; gap:10px; }
+  .contact-icon { width:20px; height:20px; flex-shrink:0; color:#1a1815; }
+  .contact-text { font-size:15px; min-width:0; }
+  /* 复制小图标按钮 */
+  .copy-btn {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:26px; height:26px; padding:0; flex-shrink:0;
+    border:none; border-radius:5px; background:transparent; color:#6a655c; cursor:pointer;
+    transition:background .2s,color .2s;
+  }
+  .copy-btn svg { width:15px; height:15px; }
+  .copy-btn:hover { background:rgba(26,24,21,.08); color:#1a1815; }
+  /* 操作按钮：黑色线框、统一宽度 */
+  .contact-btn {
+    margin-left:auto; font-family:var(--mono); font-size:12px;
+    width:104px; padding:7px 0; text-align:center;
+    border:1px solid #1a1815; border-radius:20px; background:transparent; color:#1a1815; cursor:pointer;
+    transition:background .25s,color .25s; white-space:nowrap;
+  }
+  .contact-btn:hover { background:#1a1815; color:#fff; }
+  /* 复制成功 Toast */
+  .toast {
+    position:fixed; left:50%; bottom:48px; transform:translate(-50%,20px); z-index:400;
+    padding:10px 22px; border-radius:24px; background:#1a1815; color:#fff;
+    font-family:var(--mono); font-size:13px; letter-spacing:.02em;
+    opacity:0; pointer-events:none; transition:opacity .3s ease,transform .3s ease;
+  }
+  .toast.show { opacity:1; transform:translate(-50%,0); }
+  /* 二维码弹窗 */
+  .qr-modal {
+    position:fixed; inset:0; z-index:300; display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  }
+  .qr-modal.open { display:flex; }
+  .qr-box { position:relative; background:#fff; padding:20px; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  .qr-box img { display:block; width:min(72vw,420px); height:auto; }
+  .qr-close {
+    position:absolute; top:-14px; right:-14px; width:34px; height:34px; border-radius:50%;
+    border:none; background:#1a1815; color:#fff; font-size:20px; line-height:1; cursor:pointer;
+  }
+  /* ===== 作品视图：Classic Mac 桌面，半透明叠在 3D 屏幕上 ===== */
+  .portfolio-view { position:fixed; inset:0; z-index:60; pointer-events:none; display:none; }
+  .portfolio-view.active { display:block; }
+  .portfolio-screen {
+    position:absolute; overflow:hidden; pointer-events:auto;
+    /* 半透明：让底下 3D 屏幕的 CRT 波纹/辉光/玻璃反光透上来 */
+    background:rgba(6,10,14,0.22); opacity:0; transform:scale(.96);
+    transition:opacity .5s ease,transform .7s cubic-bezier(.2,.7,.2,1);
+    /* 圆角由 JS 按真实屏幕比例设置，保证一致 */
+    border-radius:var(--pf-radius,3px);
+  }
+  .portfolio-view.show .portfolio-screen { opacity:1; transform:scale(1); }
+  /* CRT 扫描线（玻璃反光由底下 3D 屏幕原生提供，不叠加） */
+  .pf-scanlines {
+    position:absolute; inset:0; z-index:8; pointer-events:none;
+    /* 密集 CRT 扫描线：1px 暗线 + 1px 间隔（调淡让原生玻璃反光透出） */
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0px,rgba(0,0,0,.2) 1px,transparent 1px,transparent 2px);
+    box-shadow:inset 0 0 70px 20px rgba(0,0,0,.3);
+  }
+  /* ===== 复古终端风 UI（黑底 + 白色线框 + 白字 + 彩色图标）===== */
+  .mac-desktop {
+    position:absolute; inset:0; z-index:2; overflow:hidden;
+    font-family:var(--mono); color:var(--a2);
+    background:rgba(0,0,0,.06);
+  }
+  /* 屏幕内导航栏（与首页顶栏一致：Logo 左 / Tab 右） */
+  .mac-menubar {
+    position:absolute; top:0; left:0; right:0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px clamp(28px,4vw,64px);
+    background:rgba(0,0,0,.78); color:#fff;
+    border-bottom:1px solid rgba(240,240,238,.55);
+    box-shadow:0 2px 14px rgba(0,0,0,.3);
+  }
+  .pf-logo { display:flex; align-items:center; text-decoration:none; }
+  .pf-logo-img { height:18px; width:auto; object-fit:contain; filter:brightness(0) invert(1); }
+  .pf-tabs { display:flex; align-items:center; gap:40px; list-style:none; margin:0; padding:0; }
+  .pf-tabs a {
+    font-family:var(--mono); font-size:13px; letter-spacing:2px;
+    text-decoration:none; color:#fff; position:relative; cursor:pointer;
+  }
+  .pf-tabs a::after {
+    content:''; position:absolute; bottom:-4px; left:0; width:0; height:1px;
+    background:#fff; transition:width .3s ease;
+  }
+  .pf-tabs a:hover::after, .pf-tabs a.active::after { width:100%; }
+  /* 作品视图：隐藏网页顶栏，避免两行导航重复 */
+  body.portfolio-mode .navbar { display:none; }
+  .mac-icons {
+    position:absolute; top:10%; left:3%; right:3%; bottom:3%;
+    /* 列优先：每列固定 5 个，从上往下；第 6 个自动进第二列 */
+    display:grid; grid-auto-flow:column;
+    grid-template-rows:repeat(5, 1fr);
+    grid-auto-columns:clamp(72px,8vw,112px);
+    gap:clamp(10px,2vh,20px) clamp(14px,2.6vw,34px);
+    justify-items:center;
+    overflow-x:auto; overflow-y:hidden;
+    scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.3) transparent;
+  }
+  .mac-icons::-webkit-scrollbar { width:5px; }
+  .mac-icons::-webkit-scrollbar-thumb { background:rgba(255,255,255,.3); border-radius:3px; }
+  .mac-icon {
+    display:flex; flex-direction:column; align-items:center; gap:5px;
+    width:clamp(66px,7.5vw,104px); text-decoration:none; color:var(--a2); cursor:pointer;
+  }
+  /* 图标容器：白色线框方块；里面放彩色图标 */
+  .mac-ico {
+    width:clamp(40px,4.6vw,62px); height:clamp(40px,4.6vw,62px); display:flex;
+    align-items:center; justify-content:center;
+    border:none; border-radius:2px;
+    transition:transform .2s,background .2s;
+  }
+  .mac-ico svg { width:78%; height:78%; display:block; }
+  .mac-ico img { width:100%; height:100%; object-fit:contain; display:block; }
+  .mac-icon:hover .mac-ico { transform:scale(1.06); background:rgba(255,255,255,.08); }
+  .mac-label {
+    font-size:clamp(9px,1vw,13px); line-height:1.3; text-align:center;
+    padding:2px 4px; border:1px solid transparent;
+    text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.7);
+  }
+  .mac-sub { font-size:0.78em; opacity:.7; }
+  .mac-icon:hover .mac-label { background:var(--a2); color:#000; text-shadow:none; }
+  .mac-icon:hover .mac-sub { opacity:1; }
+  /* ===== 个人项目子页 ===== */
+  .personal-view {
+    position:absolute; inset:0; z-index:4;
+    /* 背景与首页一致：透明，透出底下 3D 屏幕的反光/CRT */
+    background:transparent;
+    opacity:0; visibility:hidden; transition:opacity .35s ease,visibility .35s;
+  }
+  .personal-view.open { opacity:1; visibility:visible; }
+  /* 进入子页：隐藏首页的图标区和导航栏，避免重叠 */
+  .mac-desktop.personal-open > .mac-icons,
+  .mac-desktop.personal-open > .mac-menubar { visibility:hidden; }
+  .personal-menubar {
+    position:absolute; top:0; left:0; right:0;
+    display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+    padding:18px clamp(28px,4vw,64px);
+    background:rgba(0,0,0,.78); color:#fff;
+    border-bottom:1px solid rgba(240,240,238,.55);
+    box-shadow:0 2px 14px rgba(0,0,0,.3);
+  }
+  .personal-back {
+    display:flex; align-items:center; gap:8px; justify-self:start;
+    text-decoration:none; color:#fff; cursor:pointer; font-size:13px; letter-spacing:1px;
+  }
+  .personal-back svg { width:18px; height:18px; }
+  .personal-back:hover { opacity:.7; }
+  .personal-title { font-size:15px; font-weight:600; letter-spacing:2px; }
+  .personal-clock { justify-self:end; font-size:13px; letter-spacing:1px; opacity:.85; }
+  /* 子页网格完全继承 .mac-icons，与首页保持一致的划分 */
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm"
+}}
 </script>
+</head>
+<body>
+<nav class="navbar">
+  <a href="#" class="nav-logo" id="logoLink"><img src="Logo.webp" alt="Logo" class="logo-img"></a>
+  <ul class="nav-links">
+    <li><a id="nav-enter">Portfolio</a></li>
+    <li><a href="#" id="nav-works">Resume</a></li>
+  </ul>
+</nav>
 
+<!-- 左侧乱码文本区域（ScrambleText） -->
+<div id="scrambleArea" class="scramble-area">
+  <div id="scrambleText" class="scrambled-text"></div>
+</div>
+
+<button id="enterBtn">Enter</button>
+<div id="zoomOverlay"></div>
+<div id="err"></div>
+<div id="exportBox">
+  <div style="font-size:12px;margin-bottom:6px;">参数链接：</div>
+  <textarea id="exportUrl" readonly></textarea>
+  <button id="copyBtn">复制</button><button id="closeExport">关闭</button>
+</div>
+<canvas id="c"></canvas>
+
+<!-- ===== About Me 弹层 ===== -->
+<div id="aboutOverlay" class="about-overlay">
+  <button id="aboutClose" class="about-close" aria-label="关闭">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="about-inner">
+    <!-- 左：3D 挂绳名片 -->
+    <div class="about-left" id="aboutLeft"></div>
+    <!-- 右：文字信息 -->
+    <div class="about-right">
+      <h1 class="about-name">JihoKim</h1>
+      <div class="about-tags">
+        <span>11年设计经验</span><span>团队效率提升</span><span>VibeCoding</span><span>业务经验</span><span>Base 杭州</span>
+      </div>
+      <div class="about-timeline">
+        <div class="tl-item">
+          <div class="tl-head"><span class="tl-date">2019～至今</span><span class="tl-org">灵卡科技</span><span class="tl-role">用户体验总监</span></div>
+          <p>支付宝投资企业，中国最大灵活用工招聘平台，C轮融资。</p>
+          <p>负责青团社平台BC端全链路体验、设计团队管理、健康度业务、GEO业务及品牌视觉设计。</p>
+          <p>不断打磨产品体验，为求职者和商家无限提升撮合效率，以实现平台长期业务价值。</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-head"><span class="tl-date">2017～2019</span><span class="tl-org">阿里巴巴·钉钉</span><span class="tl-role">资深体验设计师</span></div>
+          <p>阿里巴巴旗下智能移动办公平台，中国最大企业级SaaS。</p>
+          <p>负责并参与Smart Work业务线多个项目，如审批、智能人事、钉钉新校招等，深入 B端企业用户的实际场景中，为其提供高效增能的产品体验。</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-head"><span class="tl-date">2015～2017</span><span class="tl-org">必连Blink</span><span class="tl-role">设计主管</span></div>
+          <p>公司由创新工场、红杉中国领投，过亿美元估值，专注于C端社交领域。</p>
+          <p>负责各项目主设计、设计团队管理工作，在职期间参与快看Blink、美播直播、GeGe、鬼畜输入法等多个爆款项目，为C端用户创造惊喜和趣味十足的创新设计。</p>
+        </div>
+      </div>
+      <div class="about-contact">
+        <div class="contact-row">
+          <!-- Lucide: message-circle -->
+          <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          <span class="contact-text">AmosKim</span>
+          <button class="copy-btn" data-copy="AmosKim" title="复制微信号" aria-label="复制微信号">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="contact-btn" id="wechatBtn">查看二维码</button>
+        </div>
+        <div class="contact-row">
+          <!-- Lucide: mail -->
+          <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          <span class="contact-text">amoskim@outlook.com</span>
+          <button class="copy-btn" data-copy="amoskim@outlook.com" title="复制邮箱地址" aria-label="复制邮箱地址">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="contact-btn" id="emailBtn">发送邮件</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ===== 作品视图：Classic Mac 桌面，半透明叠在 3D 屏幕上（透出原生 CRT 波纹+玻璃反光）===== -->
+<div id="portfolioView" class="portfolio-view">
+  <div id="portfolioScreen" class="portfolio-screen">
+    <div class="mac-desktop">
+      <!-- 顶部导航栏：Logo + Tab（与首页一致） -->
+      <div class="mac-menubar">
+        <a href="#" class="pf-logo" id="pfLogo"><img src="Logo.webp" alt="Logo" class="pf-logo-img"></a>
+        <ul class="pf-tabs">
+          <li><a id="pfPortfolio">Portfolio</a></li>
+          <li><a href="#" id="pfResume">Resume</a></li>
+        </ul>
+      </div>
+      <!-- 桌面图标区（列优先，每列 5 个） -->
+      <div class="mac-icons">
+        <a class="mac-icon" href="#"><span class="mac-ico"><img src="qts-icon.png" alt="青团社"></span><span class="mac-label">青团社<br><span class="mac-sub">2019-至今</span></span></a>
+        <a class="mac-icon" href="#"><span class="mac-ico"><img src="dingtalk-icon.png" alt="钉钉"></span><span class="mac-label">钉钉<br><span class="mac-sub">2017-2019</span></span></a>
+        <a class="mac-icon" href="#"><span class="mac-ico"><img src="必连.png" alt="必连"></span><span class="mac-label">必连<br><span class="mac-sub">2015-2017</span></span></a>
+        <a class="mac-icon" href="#"><span class="mac-ico"><img src="设计管理.png" alt="设计管理"></span><span class="mac-label">设计管理<br><span class="mac-sub">效率与质量</span></span></a>
+        <a class="mac-icon" href="#"><span class="mac-ico"><img src="GEO项目.png" alt="GEO项目"></span><span class="mac-label">GEO项目<br><span class="mac-sub">2026-至今</span></span></a>
+        <a class="mac-icon" href="#" id="personalIcon"><span class="mac-ico"><img src="个人项目.png" alt="个人项目"></span><span class="mac-label">个人项目<br><span class="mac-sub">AI与商务合作</span></span></a>
+      </div>
+      <!-- ===== 个人项目子页（点个人项目图标进入）===== -->
+      <div class="personal-view" id="personalView">
+        <div class="personal-menubar">
+          <a href="#" class="personal-back" id="personalBack">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            <span>返回</span>
+          </a>
+          <div class="personal-title">个人项目</div>
+          <div class="personal-clock" id="personalClock">9:41 AM</div>
+        </div>
+        <div class="mac-icons personal-icons">
+          <a class="mac-icon" href="https://jiho.work/cutiepet/index.html" target="_blank" rel="noopener noreferrer"><span class="mac-ico"><img src="cutiepet.webp" alt="Cutie Pet"></span><span class="mac-label">Cutie Pet<br><span class="mac-sub">电子宠物游戏</span></span></a>
+          <a class="mac-icon" href="https://jiho.work/karinarun/index.html" target="_blank" rel="noopener noreferrer"><span class="mac-ico"><img src="karinarun.webp" alt="Karina Run"></span><span class="mac-label">Karina Run<br><span class="mac-sub">柳智敏同人跑酷</span></span></a>
+          <a class="mac-icon" href="https://jiho.work/magichand/index.html" target="_blank" rel="noopener noreferrer"><span class="mac-ico"><img src="magichand.webp" alt="Magic Hand"></span><span class="mac-label">Magic Hand<br><span class="mac-sub">摄像头实时特效</span></span></a>
+          <a class="mac-icon" href="https://jiho.work/fpsbuddy/index.html" target="_blank" rel="noopener noreferrer"><span class="mac-ico"><img src="fpsbuddy.webp" alt="FPS Buddy"></span><span class="mac-label">FPS Buddy<br><span class="mac-sub">练枪小工具</span></span></a>
+        </div>
+      </div>
+    </div>
+    <!-- CRT 覆盖层：密集扫描线（玻璃反光由底下 3D 屏幕原生提供） -->
+    <div class="pf-scanlines"></div>
+  </div>
+</div>
+<!-- 微信二维码弹窗 -->
+<div id="qrModal" class="qr-modal">
+  <div class="qr-box"><button id="qrClose" class="qr-close">×</button><img src="wechat-qr.jpg" alt="微信二维码"></div>
+</div>
+<!-- 复制成功 Toast -->
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import Lanyard from './lanyard.js';
+import GUI from 'lil-gui';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const qs = new URLSearchParams(location.search);
+const num = (k, short, d) => {
+  if (qs.get(k) != null) return parseFloat(qs.get(k));
+  if (short && qs.get(short) != null) return parseFloat(qs.get(short));
+  return d;
+};
+
+// ===== 用户定稿参数（仅 Apple II 版本，其他模型已弃用）=====
+const IS_APPLE = true;
+const modelFile = 'apple_ii_computer.glb';
+const SCREEN_MESH_NAME = 'Object_42';
+document.body.classList.add('apple-mode');
+
+// Apple II 明亮棚拍参数（复刻原图，用户定稿）
+// 颜色参数用字符串（lil-gui addColor 支持）
+const str = (k, d) => qs.get(k) || d;
+const DEF = IS_APPLE
+  ? { exposure:0.77, envIntensity:0.33, keyLight:3, rimLight:0.83, screenPoint:0, screenSpot:0,
+      bloomStrength:0.5, bloomRadius:0.4, bloomThreshold:0.85, screenCore:0.44, scanline:0.52,
+      flicker:0.4, grain:0.03, metalness:0.3,
+      bgTop:'#A49F8F', bgBottom:'#ada794', keyColor:'#ffd06b', rimColor:'#e7d283',
+      keyX:-4.1, keyY:10.8, keyZ:8.1, crtColor:'#505143', softboxInt:14, glassReflect:1.95,
+      camY:0.55, camX:0.58, camZ:0.98, targetY:-0.12, targetX:0.46, shadowRadius:25, shadowBlur:32, shadowOpacity:0.4 }
+  : { exposure:0.64, envIntensity:0.75, keyLight:2.11, rimLight:0.3, screenPoint:20, screenSpot:12,
+      bloomStrength:0.28, bloomRadius:0.4, bloomThreshold:0.6, screenCore:1.39, scanline:1.05,
+      flicker:1.46, grain:0.035, metalness:0.48,
+      bgTop:'#1a1a1a', bgBottom:'#000000', keyColor:'#ffd9a8', rimColor:'#8fa8d8',
+      keyX:5, keyY:9, keyZ:7, crtColor:'#6fa8ff', softboxInt:22, glassReflect:2.5,
+      camY:0.12, camX:1.07, camZ:-0.61, targetY:0.06, targetX:0, shadowRadius:8, shadowBlur:16, shadowOpacity:0.32 };
+const S = {
+  exposure:       num('exposure', null, DEF.exposure),
+  envIntensity:   num('envIntensity', 'env', DEF.envIntensity),
+  keyLight:       num('keyLight', 'key', DEF.keyLight),
+  rimLight:       num('rimLight', 'rim', DEF.rimLight),
+  screenPoint:    num('screenPoint', 'sl', DEF.screenPoint),
+  screenSpot:     num('screenSpot', 'ss', DEF.screenSpot),
+  bloomStrength:  num('bloomStrength', 'bs', DEF.bloomStrength),
+  bloomRadius:    num('bloomRadius', 'br', DEF.bloomRadius),
+  bloomThreshold: num('bloomThreshold', 'bt', DEF.bloomThreshold),
+  screenCore:     num('screenCore', 'core', DEF.screenCore),
+  scanline:       num('scanline', 'scan', DEF.scanline),
+  flicker:        num('flicker', 'flick', DEF.flicker),
+  grain:          num('grain', null, DEF.grain),
+  metalness:      num('metalness', 'metal', DEF.metalness),
+  bgTop:          str('bgTop', DEF.bgTop),
+  bgBottom:       str('bgBottom', DEF.bgBottom),
+  keyColor:       str('keyColor', DEF.keyColor),
+  rimColor:       str('rimColor', DEF.rimColor),
+  keyX:           num('keyX', null, DEF.keyX),
+  keyY:           num('keyY', null, DEF.keyY),
+  keyZ:           num('keyZ', null, DEF.keyZ),
+  crtColor:       str('crtColor', DEF.crtColor),
+  softboxInt:     num('softboxInt', null, DEF.softboxInt),
+  glassReflect:   num('glassReflect', null, DEF.glassReflect),
+  camX:           num('camX', 'cx', DEF.camX),
+  camY:           num('camY', null, DEF.camY),
+  camZ:           num('camZ', 'cz', DEF.camZ),
+  targetY:        num('targetY', null, DEF.targetY),
+  targetX:        num('targetX', null, DEF.targetX),
+  shadowRadius:   num('shadowRadius', null, DEF.shadowRadius),
+  shadowBlur:     num('shadowBlur', null, DEF.shadowBlur),
+  shadowOpacity:  num('shadowOpacity', null, DEF.shadowOpacity),
+};
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, preserveDrawingBuffer:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2)); // Retina 全分辨率，消除锯齿
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = S.exposure;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.VSMShadowMap;
+
+const scene = new THREE.Scene();
+// Apple II：从原图吸取的暖灰渐变背景（上 #a39d8d → 下 #7e7a6e）
+let bgTexture=null;
+function updateBackground(){
+  if(IS_APPLE){
+    // 用三个 stop 的柔和渐变（顶色 → 中间插值 → 底色）
+    const bgc=document.createElement('canvas'); bgc.width=8; bgc.height=256;
+    const bx=bgc.getContext('2d');
+    const grad=bx.createLinearGradient(0,0,0,256);
+    grad.addColorStop(0,S.bgTop);
+    grad.addColorStop(0.5,mixHex(S.bgTop,S.bgBottom,0.5));
+    grad.addColorStop(1,S.bgBottom);
+    bx.fillStyle=grad; bx.fillRect(0,0,8,256);
+    if(bgTexture) bgTexture.dispose();
+    bgTexture=new THREE.CanvasTexture(bgc); bgTexture.colorSpace=THREE.SRGBColorSpace;
+    scene.background=bgTexture;
+  } else {
+    scene.background = new THREE.Color(S.bgTop);
+  }
+}
+function mixHex(a,b,t){
+  const pa=parseInt(a.slice(1),16), pb=parseInt(b.slice(1),16);
+  const r=Math.round((pa>>16)*(1-t)+(pb>>16)*t);
+  const g=Math.round(((pa>>8)&0xff)*(1-t)+((pb>>8)&0xff)*t);
+  const bl=Math.round((pa&0xff)*(1-t)+(pb&0xff)*t);
+  return '#'+((1<<24)+(r<<16)+(g<<8)+bl).toString(16).slice(1);
+}
+updateBackground();
+
+// ===== 生成式真正 HDR 影棚环境（浮点数据，柔光箱亮度远超 1.0）=====
+function makeStudioEnv(){
+  const W=512, H=256;
+  const data=new Float32Array(W*H*4);
+  // 基础环境：顶部暖灰亮、地平线、地面暗（线性空间 HDR 值）
+  function base(v){ // v: 0=顶 1=底
+    if(v<0.5){ const t=v/0.5; return [0.85-0.25*t, 0.82-0.25*t, 0.74-0.24*t]; }
+    const t=(v-0.5)/0.5; return [0.5-0.32*t, 0.48-0.3*t, 0.42-0.26*t];
+  }
+  // 柔光箱：{u,v,半径u,半径v,亮度,色调}
+  const bi=S.softboxInt;
+  const boxes=[
+    {u:0.22,v:0.14,ru:0.20,rv:0.14,int:bi,      tint:[1.0,0.94,0.84]}, // 主暖光箱（左上，高位→屏幕上部反光）
+    {u:0.70,v:0.30,ru:0.11,rv:0.16,int:bi*0.45, tint:[0.88,0.93,1.0]},  // 冷补光箱（右上）
+    {u:0.48,v:0.12,ru:0.30,rv:0.08,int:bi*0.36, tint:[1.0,1.0,1.0]},    // 顶部长条
+    {u:0.90,v:0.5, ru:0.08,rv:0.14,int:bi*0.18, tint:[1.0,0.92,0.78]},  // 侧面弱反光
+  ];
+  for(let j=0;j<H;j++) for(let i=0;i<W;i++){
+    const u=i/W, v=j/H;
+    let col=base(v);
+    for(const b of boxes){
+      const du=(u-b.u)/b.ru, dv=(v-b.v)/b.rv;
+      const d=Math.sqrt(du*du+dv*dv);
+      if(d<1){
+        const fall=Math.pow(1-d,1.5)*b.int; // 柔和衰减
+        col=[col[0]+b.tint[0]*fall, col[1]+b.tint[1]*fall, col[2]+b.tint[2]*fall];
+      }
+    }
+    const o=(j*W+i)*4;
+    data[o]=col[0]; data[o+1]=col[1]; data[o+2]=col[2]; data[o+3]=1;
+  }
+  const tex=new THREE.DataTexture(data,W,H,THREE.RGBAFormat,THREE.FloatType);
+  tex.mapping=THREE.EquirectangularReflectionMapping;
+  tex.colorSpace=THREE.LinearSRGBColorSpace; // 浮点数据已是线性
+  tex.needsUpdate=true;
+  return tex;
+}
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+let envRT=null;
+function updateEnvironment(){
+  if(envRT) envRT.dispose();
+  if(IS_APPLE){
+    const tex=makeStudioEnv();
+    envRT=pmrem.fromEquirectangular(tex);
+    tex.dispose();
+  } else {
+    envRT=pmrem.fromScene(new RoomEnvironment(), 0.04);
+  }
+  scene.environment=envRT.texture;
+}
+updateEnvironment();
+scene.environmentRotation = new THREE.Euler(0, 0.3, 0);
+
+const keyLight = new THREE.DirectionalLight(S.keyColor, S.keyLight);
+keyLight.position.set(S.keyX, S.keyY, S.keyZ);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 1; keyLight.shadow.camera.far = 50;
+keyLight.shadow.camera.left = -12; keyLight.shadow.camera.right = 12;
+keyLight.shadow.camera.top = 12; keyLight.shadow.camera.bottom = -12;
+keyLight.shadow.bias = -0.0002;
+keyLight.shadow.normalBias = 0.02;
+keyLight.shadow.radius = S.shadowRadius;
+keyLight.shadow.blurSamples = S.shadowBlur;
+scene.add(keyLight);
+
+const rimLight = new THREE.DirectionalLight(S.rimColor, S.rimLight);
+rimLight.position.set(-6, 5, -8);
+scene.add(rimLight);
+
+// ===== 影棚柔光箱（RectAreaLight：大面积柔和光源，消除硬高光）=====
+if(IS_APPLE){
+  RectAreaLightUniformsLib.init();
+  const soft1=new THREE.RectAreaLight(0xfff4e0, 3.2, 10, 8); // 主柔光箱
+  soft1.position.set(-7,9,7); soft1.lookAt(0,3,0); scene.add(soft1);
+  const soft2=new THREE.RectAreaLight(0xe8f0ff, 1.2, 8, 6);  // 冷补光
+  soft2.position.set(8,6,4); soft2.lookAt(0,3,0); scene.add(soft2);
+  // 降低硬方向光强度，让柔光箱主导
+  keyLight.intensity=S.keyLight*0.35;
+}
+
+// Apple：透明接影平面（只显示阴影，不显示地面颜色）→ 背景渐变无接缝
+// personal：保留深色地面
+const groundMat = IS_APPLE
+  ? new THREE.ShadowMaterial({ color:0x000000, opacity:S.shadowOpacity })
+  : new THREE.MeshStandardMaterial({ color:0x0a0a0c, roughness:0.9, metalness:0 });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ===== 接触阴影贴片：弥散的柔和暗晕（模拟 AO / 真实软阴影的底部聚集）=====
+let contactShadow=null;
+if(IS_APPLE){
+  const c=document.createElement('canvas'); c.width=c.height=256;
+  const x=c.getContext('2d');
+  const g=x.createRadialGradient(128,128,0,128,128,128);
+  g.addColorStop(0,'rgba(0,0,0,0.55)');
+  g.addColorStop(0.35,'rgba(0,0,0,0.34)');
+  g.addColorStop(0.7,'rgba(0,0,0,0.10)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=g; x.fillRect(0,0,256,256);
+  const tex=new THREE.CanvasTexture(c);
+  const cm=new THREE.MeshBasicMaterial({ map:tex, transparent:true, depthWrite:false, opacity:0.9 });
+  contactShadow=new THREE.Mesh(new THREE.PlaneGeometry(1,1),cm);
+  contactShadow.rotation.x=-Math.PI/2;
+  contactShadow.renderOrder=1;
+  scene.add(contactShadow);
+  // 根据模型底部包围盒定位（在 onload 里模型加载后调用）
+}
+
+const screenLight = new THREE.PointLight(0xcfe4ff, S.screenPoint, 20, 2);
+scene.add(screenLight);
+const screenSpot = new THREE.SpotLight(0xdcecff, S.screenSpot, 22, Math.PI/4, 0.8, 1.0);
+screenSpot.castShadow = false;
+scene.add(screenSpot);
+scene.add(screenSpot.target);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.01, 1000);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.09;     // 丝滑阻尼
+controls.enableZoom = false;       // 禁止鼠标滚轮缩放
+controls.rotateSpeed = 0.7;
+
+// ===== 禁止浏览器页面级缩放（触控板双指捏合 / Ctrl+滚轮）=====
+// Chrome 里触控板捏合会发出 ctrlKey=true 的 wheel 事件，阻止它即可禁用页面缩放
+window.addEventListener('wheel',(e)=>{
+  if(e.ctrlKey || e.metaKey){ e.preventDefault(); }
+},{ passive:false });
+// Safari 手势事件
+document.addEventListener('gesturestart',(e)=>e.preventDefault());
+
+// ===== 转到背面时松手缓慢回正 =====
+let homeSpherical=null;            // 初始球坐标（updateCamera 里记录）
+const recentering={ active:false };
+function normAngle(a){ while(a>Math.PI)a-=Math.PI*2; while(a<-Math.PI)a+=Math.PI*2; return a; }
+controls.addEventListener('start',()=>{ recentering.active=false; }); // 重新拖拽时取消回正
+controls.addEventListener('end',()=>{
+  if(!homeSpherical||intro.playing||drift.active||entering) return;
+  const s=new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+  // 转过侧面接近背面（偏差 > 90°）才回正
+  if(Math.abs(normAngle(s.theta-homeSpherical.theta))>Math.PI*0.5) recentering.active=true;
+});
+
+// ===== Enter 按钮纹理（画进 CRT 屏幕，真正贴在屏幕上）=====
+function makeEnterTexture(){
+  const c=document.createElement('canvas');
+  c.width=512; c.height=200;
+  const x=c.getContext('2d');
+  x.clearRect(0,0,512,200);
+  // 圆角胶囊白框
+  const bx=56, by=55, bw=400, bh=90, r=45;
+  x.strokeStyle='#ffffff'; x.lineWidth=6;
+  x.beginPath();
+  x.moveTo(bx+r,by);
+  x.lineTo(bx+bw-r,by);
+  x.arc(bx+bw-r,by+r,r,-Math.PI/2,Math.PI/2);
+  x.lineTo(bx+r,by+bh);
+  x.arc(bx+r,by+bh-r,r,Math.PI/2,-Math.PI/2);
+  x.closePath(); x.stroke();
+  // 文字
+  x.fillStyle='#ffffff';
+  x.font='600 46px Menlo, Monaco, Consolas, "Liberation Mono", monospace';
+  x.textAlign='center'; x.textBaseline='middle';
+  x.fillText('Enter', 256, 102);
+  const tex=new THREE.CanvasTexture(c);
+  tex.colorSpace=THREE.SRGBColorSpace;
+  return tex;
+}
+const enterTex=makeEnterTexture();
+
+// ===== CRT 屏幕着色器 =====
+const crtUniforms = {
+  uTime:{value:0},
+  uColor:{value:new THREE.Color(S.crtColor)},
+  uCore:{value:S.screenCore},
+  uScan:{value:S.scanline},
+  uFlick:{value:S.flicker},
+  uBtn:{value:enterTex},
+  uBtnOn:{value:0}, // 按钮是否显示（0/1）
+  uBtnScale:{value:1.0}, // hover 时按钮放大
+  uGlare:{value:0}, // 关闭手画反光，改用真实 PBR 玻璃层反射 HDR
+};
+const crtMaterial = new THREE.ShaderMaterial({
+  uniforms: crtUniforms,
+  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader:`
+    uniform float uTime; uniform vec3 uColor; uniform float uCore; uniform float uScan; uniform float uFlick;
+    uniform sampler2D uBtn; uniform float uBtnOn; uniform float uGlare; uniform float uBtnScale;
+    varying vec2 vUv;
+    void main(){
+      vec2 uv=vUv;
+      vec3 col=vec3(0.01,0.015,0.025);
+      float scan=0.5+0.5*sin(uv.y*620.0);
+      col+=uColor*scan*0.04*uScan;
+      float band=fract(uv.y-uTime*0.12);
+      col+=uColor*smoothstep(0.0,0.05,band)*(1.0-smoothstep(0.05,0.12,band))*0.08;
+      col*=1.0-uFlick*0.06+uFlick*0.06*sin(uTime*34.0);
+      float vig=smoothstep(0.0,0.28,uv.x)*smoothstep(0.0,0.28,1.0-uv.x)*smoothstep(0.0,0.28,uv.y)*smoothstep(0.0,0.28,1.0-uv.y);
+      col*=mix(0.25,1.0,vig);
+      float center=1.0-smoothstep(0.0,0.45,distance(uv,vec2(0.5)));
+      col+=uColor*pow(center,2.0)*uCore;
+      float edge=smoothstep(0.42,0.5,max(abs(uv.x-0.5),abs(uv.y-0.5)));
+      col+=uColor*edge*0.25;
+      // Enter 按钮：在屏幕中心采样纹理，受同样的扫描线+频闪影响，真正融入 CRT
+      if(uBtnOn>0.5){
+        // 把整张按钮纹理映射到屏幕中央矩形；uBtnScale>1 时按钮放大
+        vec2 region=vec2(0.74,0.30)/uBtnScale;
+        vec2 bUv=(uv-vec2(0.5))/region+vec2(0.5);
+        if(bUv.x>=0.0&&bUv.x<=1.0&&bUv.y>=0.0&&bUv.y<=1.0){
+          vec4 btn=texture2D(uBtn,bUv);
+          float btnGlow=(0.5+0.5*sin(uv.y*620.0))*0.15+0.85;
+          col=mix(col, btn.rgb*btnGlow, btn.a);
+        }
+      }
+      // 玻璃弧形反光（复刻原图屏幕那条上翘的弧线 + 右上亮点）
+      if(uGlare>0.5){
+        // 抛物线弧：中心 y≈0.66，两端上翘到 y≈0.76
+        float arcY=0.66+0.28*pow(abs(uv.x-0.5)*2.0,2.0);
+        float arc=exp(-pow((uv.y-arcY)*90.0,2.0));
+        arc*=smoothstep(0.06,0.18,uv.x)*smoothstep(0.06,0.18,1.0-uv.x); // 两端淡出
+        col+=vec3(0.55,0.56,0.5)*arc*0.5;
+        // 右上白色亮点
+        float spot=exp(-pow(distance(uv,vec2(0.62,0.80))*55.0,2.0));
+        col+=vec3(0.9,0.9,0.82)*spot*0.8;
+        // 下方另一个小反光点（原图屏幕下方偏左）
+        float spot2=exp(-pow(distance(uv,vec2(0.42,0.42))*70.0,2.0));
+        col+=vec3(0.7,0.68,0.55)*spot2*0.35;
+      }
+      gl_FragColor=vec4(col,1.0);
+    }
+  `,
+  side: THREE.DoubleSide,
+  toneMapped: false
+});
+
+// ===== CRT 玻璃层：真实 PBR 反射 HDR 环境，形成柔和弧形高光 =====
+function makeConvexNormalMap(){
+  // 生成微凸球面的法线贴图：中心法线朝外，边缘逐渐倾斜 → 反射随位置弯曲成弧
+  const size=256, c=document.createElement('canvas'); c.width=c.height=size;
+  const x=c.getContext('2d'), img=x.createImageData(size,size);
+  for(let j=0;j<size;j++) for(let i=0;i<size;i++){
+    // uv → -1..1，凸面球的法线
+    const nx=(i/size-0.5)*2*0.55, ny=(j/size-0.5)*2*0.55;
+    const nz=Math.sqrt(Math.max(0.001,1-nx*nx-ny*ny));
+    const o=(j*size+i)*4;
+    img.data[o]  =(nx*0.5+0.5)*255;
+    img.data[o+1]=(ny*0.5+0.5)*255;
+    img.data[o+2]=(nz*0.5+0.5)*255;
+    img.data[o+3]=255;
+  }
+  x.putImageData(img,0,0);
+  const t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
+  return t;
+}
+const glassNormal=makeConvexNormalMap();
+let glassMatRef=null;
+function makeGlassMaterial(){
+  glassMatRef=new THREE.MeshPhysicalMaterial({
+    color:0x111111,
+    transparent:true, opacity:0.55,
+    roughness:0.05, metalness:0.35,       // 加金属度让 HDR 反射更明显
+    clearcoat:1.0, clearcoatRoughness:0.03,
+    normalMap:glassNormal,
+    normalScale:new THREE.Vector2(0.9,0.9), // 曲率更大，反光弯曲成弧
+    envMapIntensity:S.glassReflect,
+    depthWrite:false,
+    side:THREE.FrontSide,
+  });
+  return glassMatRef;
+}
+
+// ===== 后处理（MSAA 多重采样抗锯齿）=====
+const renderTarget = new THREE.WebGLRenderTarget(
+  innerWidth*renderer.getPixelRatio(), innerHeight*renderer.getPixelRatio(),
+  { samples: 4, type: THREE.HalfFloatType } // 4x MSAA + 半浮点保留 HDR 高光
+);
+const composer = new EffectComposer(renderer, renderTarget);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight), S.bloomStrength, S.bloomRadius, S.bloomThreshold);
+composer.addPass(bloom);
+const grainPass = new ShaderPass({
+  uniforms:{ tDiffuse:{value:null}, uTime:{value:0}, uAmount:{value:S.grain} },
+  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader:`
+    uniform sampler2D tDiffuse; uniform float uTime; uniform float uAmount; varying vec2 vUv;
+    float rand(vec2 co){ return fract(sin(dot(co,vec2(12.9898,78.233)))*43758.5453); }
+    void main(){
+      vec4 c=texture2D(tDiffuse,vUv);
+      c.rgb+=(rand(vUv*vec2(1024.0,768.0)+fract(uTime)*100.0)-0.5)*uAmount;
+      vec2 d=vUv-0.5; c.rgb*=1.0-dot(d,d)*0.9;
+      gl_FragColor=c;
+    }
+  `
+});
+composer.addPass(grainPass);
+composer.addPass(new OutputPass());
+
+// ===== 材质修复 =====
+const metalMaterials = [];
+function fixLegacyMaterials(root){
+  const METAL_KEYS=['metallic','gray_metallic','metal','stiker','cpu_green'];
+  root.traverse(o=>{
+    if(!o.isMesh) return;
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    mats.forEach(m=>{
+      const ext=m.userData?.gltfExtensions?.KHR_materials_pbrSpecularGlossiness;
+      if(!ext) return;
+      const d=ext.diffuseFactor||[1,1,1,1];
+      const gloss=ext.glossinessFactor!=null?ext.glossinessFactor:0.5;
+      const spec=ext.specularFactor||[0,0,0];
+      const specLum=(spec[0]+spec[1]+spec[2])/3;
+      const name=(m.name||o.name||'').toLowerCase();
+      const isMetal=METAL_KEYS.some(k=>name.includes(k));
+      m.color.setRGB(d[0],d[1],d[2]);
+      if(isMetal||specLum>0.35){
+        metalMaterials.push(m);
+        m.metalness=S.metalness;
+        m.roughness=Math.max(0.15,Math.min(0.4,1-gloss));
+      } else {
+        m.metalness=0.0;
+        m.roughness=Math.max(0.25,1-gloss);
+      }
+      m.needsUpdate=true;
+    });
+  });
+}
+
+let modelCenter=null, modelSize=null, screenMesh=null, buttonMesh=null;
+function getFinalCamera(){
+  const dist=Math.max(modelSize.x,modelSize.y,modelSize.z)*1.5;
+  // 相机 y 降低，让电脑在画面里更靠上
+  // camY 为 modelSize.y 的倍数，面板可调
+  const camY = modelSize.y*S.camY;
+  const pos=new THREE.Vector3(modelCenter.x+dist*S.camX, modelCenter.y+camY, modelCenter.z+dist*S.camZ);
+  // target 下移 → 电脑在画面里更靠上（targetY 面板可调）
+  const target=modelCenter.clone(); target.y+=modelSize.y*S.targetY;
+  // 沿相机"右方向"平移镜头，让电脑显示在画面右侧，左侧留出文本区
+  if(S.targetX){
+    const fwd=target.clone().sub(pos).normalize();
+    const right=new THREE.Vector3().crossVectors(fwd,new THREE.Vector3(0,1,0)).normalize();
+    const shift=right.multiplyScalar(-modelSize.x*S.targetX); // 负：镜头左移 → 物体偏右
+    pos.add(shift); target.add(shift);
+  }
+  return {pos,target};
+}
+function updateCamera(){
+  if(!modelCenter||!modelSize) return;
+  const {pos,target}=getFinalCamera();
+  camera.position.copy(pos);
+  camera.lookAt(target);
+  controls.target.copy(target);
+  // 锁定垂直极角：只允许水平旋转（不能上下翻）
+  const dir=pos.clone().sub(target);
+  const phi=Math.acos(THREE.MathUtils.clamp(dir.y/dir.length(),-1,1));
+  controls.minPolarAngle=Math.max(0.001,phi-0.001);
+  controls.maxPolarAngle=Math.min(Math.PI-0.001,phi+0.001);
+  controls.update();
+  homeSpherical=new THREE.Spherical().setFromVector3(camera.position.clone().sub(target));
+}
+
+// ===== 入场动画：近处旋转落位 + 曝光渐亮 =====
+const intro={ playing:false, t:0, dur:2.6,
+  startPos:new THREE.Vector3(), startTarget:new THREE.Vector3(),
+  endPos:new THREE.Vector3(), endTarget:new THREE.Vector3(), finalExposure:0.64 };
+function startIntro(){
+  if(!modelCenter||!modelSize) return;
+  const {pos,target}=getFinalCamera();
+  intro.endPos.copy(pos); intro.endTarget.copy(target);
+  intro.finalExposure=S.exposure;
+  const r=pos.clone().sub(modelCenter);
+  const startR=r.clone().multiplyScalar(0.42);
+  startR.applyAxisAngle(new THREE.Vector3(0,1,0), -Math.PI*0.6);
+  startR.y=r.y*0.6+modelSize.y*0.15;
+  intro.startPos.copy(modelCenter).add(startR);
+  intro.startTarget.copy(target);
+  intro.t=0; intro.playing=true;
+  controls.enabled=false;
+  camera.position.copy(intro.startPos);
+  camera.lookAt(intro.startTarget);
+  controls.target.copy(intro.startTarget);
+  renderer.toneMappingExposure=0;
+}
+// ===== 入场后缓慢左转（drift）=====
+const drift={ active:false, t:0, dur:3.5, amount:Math.PI*0.018, baseAngle:0 };
+function updateIntro(dt){
+  if(!intro.playing) return;
+  intro.t+=dt;
+  let p=Math.min(1,intro.t/intro.dur);
+  const e=1-Math.pow(1-p,3);
+  camera.position.lerpVectors(intro.startPos,intro.endPos,e);
+  const tgt=new THREE.Vector3().lerpVectors(intro.startTarget,intro.endTarget,e);
+  camera.lookAt(tgt);
+  controls.target.copy(tgt);
+  renderer.toneMappingExposure=intro.finalExposure*Math.pow(e,1.5);
+  if(p>=1){
+    intro.playing=false;
+    renderer.toneMappingExposure=intro.finalExposure;
+    controls.enabled=true;
+    controls.update();
+    // 启动缓慢左转 drift
+    drift.active=true; drift.t=0;
+    const off=intro.endPos.clone().sub(intro.endTarget);
+    drift.baseAngle=Math.atan2(off.x,off.z);
+  }
+}
+function updateDrift(dt){
+  if(!drift.active) return;
+  drift.t+=dt;
+  const p=Math.min(1,drift.t/drift.dur);
+  const e=1-Math.pow(1-p,2); // easeOutQuad，慢慢停下
+  const ang=drift.baseAngle + drift.amount*e; // 往右转（用户说原方向反了）
+  const off=camera.position.clone().sub(controls.target);
+  const radius=Math.hypot(off.x,off.z);
+  camera.position.x=controls.target.x+Math.sin(ang)*radius;
+  camera.position.z=controls.target.z+Math.cos(ang)*radius;
+  camera.lookAt(controls.target);
+  if(p>=1) drift.active=false;
+}
+
+// ===== 视图切换：首页 ⇄ 作品视图（相机推近摆正 + DOM 覆盖层贴合屏幕）=====
+let viewMode='home';          // 'home' | 'portfolio'
+let entering=false;           // 相机过渡中
+const homeCamera={pos:new THREE.Vector3(),target:new THREE.Vector3(),fov:50};
+const portfolioView=document.getElementById('portfolioView');
+const portfolioScreen=document.getElementById('portfolioScreen');
+
+// 屏幕内部纯黑矩形区域的缩进比例（避开圆角边缘）
+const SCREEN_INSET=0.115; // 每边缩进 11.5% → 内部矩形约占屏幕 77%
+
+// 计算屏幕内部矩形（红框区域）在世界坐标的范围
+function getInnerRect(){
+  const bm=buttonMesh||screenMesh;
+  const box=new THREE.Box3().setFromObject(bm);
+  const size=box.getSize(new THREE.Vector3());
+  const ix=size.x*(1-2*SCREEN_INSET), iy=size.y*(1-2*SCREEN_INSET);
+  return {center:box.getCenter(new THREE.Vector3()),innerW:ix,innerH:iy,fullSize:size};
+}
+
+// 计算屏幕正前方的"摆正"相机位置：让内部矩形尽可能占满视野
+function getPortfolioCamera(){
+  const bm=buttonMesh||screenMesh;
+  const {center,innerW,innerH}=getInnerRect();
+  // 屏幕法线（世界）：mesh 的 local +Z
+  bm.updateWorldMatrix(true,false);
+  const normal=new THREE.Vector3(0,0,1).transformDirection(bm.matrixWorld).normalize();
+  const tanHalf=Math.tan(camera.fov*Math.PI/360);
+  const aspect=camera.aspect;
+  // 推近到内部矩形至少一个方向铺满（另一方向超出→黑底覆盖整个视口）
+  const dH=(innerH/2)/tanHalf;
+  const dW=(innerW/2)/(tanHalf*aspect);
+  const dist=Math.min(dH,dW)*1.0;
+  const pos=center.clone().addScaledVector(normal,dist);
+  return {pos,target:center.clone(),normal,dist};
+}
+
+// 屏幕内时钟（个人项目页右侧）
+function updateMacClock(){
+  const d=new Date();
+  let h=d.getHours(), m=String(d.getMinutes()).padStart(2,'0');
+  const ap=h>=12?'PM':'AM'; h=h%12||12;
+  const str=`${h}:${m} ${ap}`;
+  const el=document.getElementById('personalClock');
+  if(el) el.textContent=str;
+}
+
+// 界面铺满整个视口（屏幕已放大到黑底覆盖全屏），展示更多内容
+function fitPortfolioToScreen(){
+  portfolioScreen.style.left='0px';
+  portfolioScreen.style.top='0px';
+  portfolioScreen.style.width='100vw';
+  portfolioScreen.style.height='100vh';
+  portfolioScreen.style.setProperty('--pf-radius','0px');
+  updateMacClock();
+}
+
+function enterWorks(){
+  if(entering||!screenMesh||viewMode==='portfolio') return;
+  entering=true;
+  // 记录首页相机状态（用于返回）
+  homeCamera.pos.copy(camera.position);
+  homeCamera.target.copy(controls.target);
+  homeCamera.fov=camera.fov;
+  controls.enabled=false;
+  intro.playing=false; drift.active=false; recentering.active=false;
+  const {pos,target}=getPortfolioCamera();
+  const startPos=camera.position.clone();
+  const startTarget=controls.target.clone();
+  const t0=performance.now();
+  const dur=950;
+  function zoom(){
+    const p=Math.min(1,(performance.now()-t0)/dur);
+    const e=p<0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2; // easeInOutQuad
+    camera.position.lerpVectors(startPos,pos,e);
+    const tgt=new THREE.Vector3().lerpVectors(startTarget,target,e);
+    camera.lookAt(tgt);
+    controls.target.copy(tgt);
+    // 按钮纹理随推进淡出
+    crtUniforms.uBtnOn.value = p<0.3 ? 1 : 0;
+    enterBtn.style.display = p<0.3 ? 'block' : 'none';
+    if(p<1) return;
+    clearInterval(zoomTimer);
+    {
+      viewMode='portfolio';
+      entering=false;
+      portfolioView.classList.add('active');
+      fitPortfolioToScreen();
+      requestAnimationFrame(()=>portfolioView.classList.add('show'));
+      // 隐藏首页 UI（保留 Logo 用于返回）
+      document.getElementById('scrambleArea').style.opacity='0';
+      document.body.classList.add('portfolio-mode');
+    }
+  }
+  const zoomTimer=setInterval(zoom,16);
+}
+
+function exitPortfolio(){
+  if(entering||viewMode!=='portfolio') return;
+  entering=true;
+  viewMode='home';
+  // DOM 淡出
+  portfolioView.classList.remove('show');
+  setTimeout(()=>portfolioView.classList.remove('active'),500);
+  document.getElementById('scrambleArea').style.opacity='';
+  document.body.classList.remove('portfolio-mode');
+  // 相机退回首页位
+  const {pos,target}=getPortfolioCamera();
+  const startPos=camera.position.clone();
+  const startTarget=controls.target.clone();
+  const t0=performance.now();
+  const dur=900;
+  function back(){
+    const p=Math.min(1,(performance.now()-t0)/dur);
+    const e=p<0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
+    camera.position.lerpVectors(startPos,homeCamera.pos,e);
+    const tgt=new THREE.Vector3().lerpVectors(startTarget,homeCamera.target,e);
+    camera.lookAt(tgt);
+    controls.target.copy(tgt);
+    if(p<1) return;
+    clearInterval(backTimer);
+    {
+      entering=false;
+      controls.enabled=true;
+      controls.update();
+      // 恢复可旋转 + 回正机制
+      const off=camera.position.clone().sub(controls.target);
+      homeSpherical=new THREE.Spherical().setFromVector3(off);
+    }
+  }
+  const backTimer=setInterval(back,16);
+}
+
+// Portfolio：首页点进入作品视图；作品视图点刷新当前页
+document.getElementById('nav-enter').addEventListener('click', ()=>{
+  if(viewMode==='portfolio') location.reload();
+  else enterWorks();
+});
+document.getElementById('enterBtn').addEventListener('click', enterWorks);
+// Logo：作品视图时返回电脑全景首页（网页顶栏 + 屏幕内两处）
+function onLogoClick(e){ e.preventDefault(); if(viewMode==='portfolio') exitPortfolio(); }
+document.getElementById('logoLink').addEventListener('click', onLogoClick);
+document.getElementById('pfLogo').addEventListener('click', onLogoClick);
+// 屏幕内 Portfolio：刷新当前页
+document.getElementById('pfPortfolio').addEventListener('click', ()=>location.reload());
+// 屏幕内 Resume：打开名片简历（与首页 Tab 一致）
+document.getElementById('pfResume').addEventListener('click', ()=>openAbout());
+// 个人项目子页：进入 / 返回
+const personalView=document.getElementById('personalView');
+let personalClockTimer=null;
+const macDesktop=document.querySelector('.mac-desktop');
+document.getElementById('personalIcon').addEventListener('click', e=>{
+  e.preventDefault();
+  personalView.classList.add('open');
+  macDesktop.classList.add('personal-open'); // 隐藏首页图标+导航
+  updateMacClock();
+  personalClockTimer=setInterval(updateMacClock,30000); // 每30秒更新
+});
+document.getElementById('personalBack').addEventListener('click', e=>{
+  e.preventDefault();
+  personalView.classList.remove('open');
+  macDesktop.classList.remove('personal-open');
+  clearInterval(personalClockTimer);
+});
+// 点击 3D 屏幕也进入（仅首页）
+const raycaster=new THREE.Raycaster();
+const mouse=new THREE.Vector2();
+let downPos=null;
+canvas.addEventListener('pointerdown', e=>{ downPos={x:e.clientX,y:e.clientY}; });
+canvas.addEventListener('pointerup', e=>{
+  if(!downPos||viewMode!=='home') return;
+  const moved=Math.hypot(e.clientX-downPos.x, e.clientY-downPos.y);
+  downPos=null;
+  if(moved>6) return; // 拖拽不算点击
+  mouse.x=(e.clientX/innerWidth)*2-1;
+  mouse.y=-(e.clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hitTarget=buttonMesh||screenMesh;
+  const hits=raycaster.intersectObject(hitTarget,true);
+  if(hits.length) enterWorks();
+});
+
+// ===== ScrambleText：原生 JS 复刻 React Bits / GSAP ScrambleText =====
+// 逐字符乱码解码 + 鼠标靠近乱码 + 点击波纹 burst（忠实组件效果与默认参数）
+(function(){
+  const root=document.getElementById('scrambleArea');
+  const textEl=document.getElementById('scrambleText');
+  const TEXT="Hi, I’m Jiho Kim.\n11 Years Design Experience\nFull-stack VibeCoding\nTeam Management\nIndependent Business Ownership";
+  const CFG={ radius:100, duration:1.2, speed:0.5, scrambleChars:'.:', strength:1, trail:0.6 };
+  if(!root||!textEl) return;
+  textEl.textContent='';
+
+  // 拆字符：按单词分组（避免单词被从中间截断），每个字符 = sizer + glyph
+  // 第一句放进 .sc-first（28px）容器，其余放 textEl（小字号）
+  const firstLine=document.createElement('span'); firstLine.className='sc-first';
+  textEl.appendChild(firstLine);
+  let target=firstLine; // 当前插入目标
+  let firstBreakDone=false;
+  const chars=[];
+  TEXT.split(/(\s+)/).forEach(token=>{
+    if(/^\s+$/.test(token)){
+      // 换行符：第一次切到正文容器（sc-first 是 block 自带换行），后续插 <br>
+      if(token.indexOf('\n')!==-1){
+        if(!firstBreakDone){ target=textEl; firstBreakDone=true; }
+        else { target.appendChild(document.createElement('br')); }
+        return;
+      }
+      // 空白：作为独立空格字符，允许换行
+      const wrap=document.createElement('span'); wrap.className='sc-char';
+      const sizer=document.createElement('span'); sizer.className='sc-sizer'; sizer.textContent='\u00A0';
+      const glyph=document.createElement('span'); glyph.className='sc-glyph'; glyph.textContent=' ';
+      wrap.appendChild(sizer); wrap.appendChild(glyph); target.appendChild(wrap);
+      chars.push({ wrap, sizer, glyph, orig:' ', x:0, y:0, scrambling:false, t0:0, dur:0, revealAt:0, lastSwap:0 });
+      return;
+    }
+    // 一个单词：nowrap 容器，内部字符独立
+    const word=document.createElement('span'); word.className='sc-word';
+    for(const ch of token){
+      const wrap=document.createElement('span'); wrap.className='sc-char';
+      const sizer=document.createElement('span'); sizer.className='sc-sizer'; sizer.textContent=ch;
+      const glyph=document.createElement('span'); glyph.className='sc-glyph'; glyph.textContent=ch;
+      wrap.appendChild(sizer); wrap.appendChild(glyph); word.appendChild(wrap);
+      chars.push({ wrap, sizer, glyph, orig:ch, x:0, y:0, scrambling:false, t0:0, dur:0, revealAt:0, lastSwap:0 });
+    }
+    target.appendChild(word);
+  });
+  const SR=document.createElement('span'); SR.className='sc-sr'; SR.textContent=TEXT;
+  textEl.insertBefore(SR,textEl.firstChild);
+  textEl.setAttribute('aria-hidden','true');
+
+  const measure=()=>{
+    const rootRect=root.getBoundingClientRect();
+    chars.forEach(c=>{
+      const r=c.wrap.getBoundingClientRect();
+      c.x=r.left-rootRect.left+r.width/2;
+      c.y=r.top-rootRect.top+r.height/2;
+      c.glyph.style.width=r.width+'px';
+    });
+  };
+
+  const rnd=()=>CFG.scrambleChars[Math.floor(Math.random()*CFG.scrambleChars.length)];
+
+  // 启动一个字符的乱码解码：duration 秒内随机跳字，revealAt 后锁定原文
+  const scrambleAt=(c,duration,revealDelay=0)=>{
+    c.scrambling=true;
+    c.t0=Date.now()+revealDelay*1000;
+    c.dur=Math.max(0.2,duration)*1000;
+    c.revealAt=c.dur*0.55; // 前 55% 全乱码，之后逐渐收敛
+    c.lastSwap=0;
+  };
+
+  const pointer={x:-1e4,y:-1e4,inside:false};
+  const waves=[];
+  let introDone=false;
+
+  // 主循环：用 setInterval 驱动（不依赖 rAF，避免被 3D 渲染节流）
+  let lastWaveTick=Date.now();
+  function frame(){
+    const now=Date.now();
+    const wdt=(now-lastWaveTick)/1000; lastWaveTick=now;
+    for(const c of chars){
+      if(!c.scrambling) continue;
+      const el=now-c.t0;
+      if(el<0) continue; // 等待 revealDelay
+      if(el>=c.dur){ c.glyph.textContent=c.orig; c.scrambling=false; continue; }
+      if(el>c.revealAt){
+        const prog=(el-c.revealAt)/(c.dur-c.revealAt);
+        if(Math.random()<prog*0.5+0.05){ c.glyph.textContent=c.orig; continue; }
+      }
+      if(now-c.lastSwap > (1-Math.min(0.95,CFG.speed))*90){
+        c.glyph.textContent=(c.orig===' '||c.orig==='\u00A0') ? '\u00A0' : rnd();
+        c.lastSwap=now;
+      }
+    }
+    // 波纹推进
+    for(let i=waves.length-1;i>=0;i--){
+      const w=waves[i]; w.age+=wdt;
+      if(w.age>=w.life){ waves.splice(i,1); continue; }
+      w.r=w.reach*(1-Math.pow(1-w.age/w.life,2));
+      chars.forEach((c,idx)=>{
+        if(w.hit[idx]) return;
+        const d=Math.hypot(c.x-w.x,c.y-w.y);
+        if(d<=w.r){ w.hit[idx]=1; scrambleAt(c,CFG.duration*(0.3+0.5*(1-d/w.reach))); }
+      });
+    }
+  }
+  setInterval(frame,16);
+
+  // intro：文字出现后整段从乱码解码（组件用 IntersectionObserver）
+  function runIntro(){
+    if(introDone) return; introDone=true;
+    measure();
+    chars.forEach((c,i)=>{
+      const reveal=0.15+CFG.duration*(0.75*(i/chars.length)+0.25*Math.random());
+      scrambleAt(c,reveal+0.15,reveal);
+    });
+  }
+  // 延迟触发 intro（比 IntersectionObserver 更可靠，不受 3D 渲染节流影响）
+  setTimeout(runIntro, 350);
+
+  // 鼠标靠近：effect='scramble' → 半径内的字符短乱码
+  root.addEventListener('pointermove',e=>{
+    if(!chars.length) return;
+    measure();
+    const rect=root.getBoundingClientRect();
+    const x=e.clientX-rect.left, y=e.clientY-rect.top;
+    chars.forEach(c=>{
+      const d=Math.hypot(c.x-x,c.y-y);
+      if(d<CFG.radius) scrambleAt(c,CFG.duration*(1-d/CFG.radius));
+    });
+  });
+  // 点击：从点击点发出乱码波纹
+  root.addEventListener('pointerdown',e=>{
+    if(e.button!==0) return;
+    measure();
+    const rect=root.getBoundingClientRect();
+    const x=e.clientX-rect.left, y=e.clientY-rect.top;
+    let reach=0; chars.forEach(c=>reach=Math.max(reach,Math.hypot(c.x-x,c.y-y)));
+    reach+=16;
+    waves.push({x,y,age:0,r:0,reach,life:0.45+reach/1100,hit:new Uint8Array(chars.length)});
+  });
+  window.addEventListener('resize',()=>{ /* 下一帧 pointer/measure 会重算 */ });
+})();
+
+// ===== About Me 弹层开关 + 联系方式 =====
+const aboutOverlay=document.getElementById('aboutOverlay');
+const qrModal=document.getElementById('qrModal');
+let aboutOpen=false;
+let aboutTimers=[];
+function clearAboutTimers(){ aboutTimers.forEach(clearTimeout); aboutTimers=[]; }
+function openAbout(){
+  if(aboutOpen) return; aboutOpen=true;
+  clearAboutTimers();
+  aboutOverlay.classList.remove('closing-card','closing-text');
+  aboutOverlay.classList.add('open');
+  requestAnimationFrame(()=>aboutOverlay.classList.add('show'));
+  startLanyard(); // 启动挂绳名片渲染
+}
+function closeAbout(){
+  if(!aboutOpen) return; aboutOpen=false;
+  clearAboutTimers();
+  // ① 名片先往上收起
+  aboutOverlay.classList.add('closing-card');
+  // ② 接着文字逐渐收起消失
+  aboutTimers.push(setTimeout(()=>aboutOverlay.classList.add('closing-text'),560));
+  // ③ 最后背景模糊才恢复
+  aboutTimers.push(setTimeout(()=>aboutOverlay.classList.remove('show'),1080));
+  // 收尾：隐藏并清理
+  aboutTimers.push(setTimeout(()=>{
+    aboutOverlay.classList.remove('open','closing-card','closing-text');
+    stopLanyard();
+  },1660));
+}
+document.getElementById('nav-works').addEventListener('click',(e)=>{ e.preventDefault(); openAbout(); });
+document.getElementById('aboutClose').addEventListener('click',closeAbout);
+aboutOverlay.addEventListener('click',(e)=>{ if(e.target===aboutOverlay) closeAbout(); });
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){ if(qrModal.classList.contains('open')) qrModal.classList.remove('open'); else closeAbout(); }
+});
+document.getElementById('wechatBtn').addEventListener('click',()=>qrModal.classList.add('open'));
+document.getElementById('qrClose').addEventListener('click',()=>qrModal.classList.remove('open'));
+qrModal.addEventListener('click',(e)=>{ if(e.target===qrModal) qrModal.classList.remove('open'); });
+document.getElementById('emailBtn').addEventListener('click',()=>{
+  window.location.href='mailto:amoskim@outlook.com?subject='+encodeURIComponent('你好 Jiho');
+});
+// 复制微信号 / 邮箱 + Toast 提示
+const toastEl=document.getElementById('toast');
+let toastTimer=null;
+function showToast(msg){
+  toastEl.textContent=msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>toastEl.classList.remove('show'),2000);
+}
+document.querySelectorAll('.copy-btn').forEach(btn=>{
+  btn.addEventListener('click',async()=>{
+    const text=btn.getAttribute('data-copy');
+    try{
+      await navigator.clipboard.writeText(text);
+    }catch{
+      // 回退：execCommand
+      const ta=document.createElement('textarea'); ta.value=text;
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    showToast(text.includes('@') ? '已复制邮箱地址' : '已复制微信号');
+  });
+});
+
+const loader = new GLTFLoader();
+loader.load(modelFile, (gltf)=>{
+  const root=gltf.scene;
+  scene.add(root);
+  const box=new THREE.Box3().setFromObject(root);
+  const size=box.getSize(new THREE.Vector3());
+  root.scale.setScalar(8/Math.max(size.x,size.y,size.z));
+  const boxScaled=new THREE.Box3().setFromObject(root);
+  root.position.y-=boxScaled.min.y;
+  root.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+
+  const box2=new THREE.Box3().setFromObject(root);
+  modelCenter=box2.getCenter(new THREE.Vector3());
+  modelSize=box2.getSize(new THREE.Vector3());
+
+  // 定位接触阴影：模型底部中心，尺寸按底部包围盒放大（弥散出去）
+  if(contactShadow){
+    const bottomY=box2.min.y;
+    contactShadow.position.set(modelCenter.x, bottomY+0.015, modelCenter.z);
+    contactShadow.scale.set(modelSize.x*1.5, modelSize.z*1.5, 1);
+  }
+
+  screenMesh=root.getObjectByName(SCREEN_MESH_NAME);
+  // Apple II：单层屏幕，直接换成 CRT+按钮材质
+  if(screenMesh){
+    screenMesh.material=crtMaterial;
+    buttonMesh=screenMesh;
+    // 叠一层真实 PBR 玻璃，反射 HDR 柔光箱形成弧形高光（复刻原图）
+    const glass=screenMesh.clone();
+    glass.material=makeGlassMaterial();
+    glass.castShadow=false; glass.receiveShadow=false;
+    // 沿屏幕正面法线微移，避免和 CRT 层 z-fighting
+    const gbox=new THREE.Box3().setFromObject(screenMesh);
+    const gsize=gbox.getSize(new THREE.Vector3());
+    // 找薄轴（屏幕法线方向）
+    const thinAxis = gsize.x<gsize.y && gsize.x<gsize.z ? 'x' : (gsize.y<gsize.z ? 'y' : 'z');
+    glass.position[thinAxis] += 0.012;
+    screenMesh.parent.add(glass);
+  }
+  updateCamera();
+  if(screenMesh){
+    const wp=buttonMesh.getWorldPosition(new THREE.Vector3());
+    const frontDir=camera.position.clone().sub(wp).setY(0).normalize();
+    screenLight.position.copy(wp).add(frontDir.clone().multiplyScalar(0.6));
+    screenSpot.position.copy(wp).add(frontDir.clone().multiplyScalar(0.3));
+    const tgt=wp.clone().add(frontDir.clone().multiplyScalar(4)); tgt.y-=2.2;
+    screenSpot.target.position.copy(tgt);
+  }
+  if(qs.get('intro')!=='0') startIntro();
+  window.__camera=camera; window.__controls=controls; window.__intro=intro; window.__drift=drift; window.__root=root; window.__THREE=THREE;
+  window.__ready=true;
+}, undefined, (err)=>{ document.getElementById('err').textContent='LOAD ERROR: '+err.message; });
+
+// ===== 更新 Enter 按钮位置（屏幕中心投影到 2D）=====
+const enterBtn=document.getElementById('enterBtn');
+// hover 时按钮平滑放大（画在 shader 里，改 uBtnScale uniform）
+let btnScaleTarget=1.0;
+enterBtn.addEventListener('mouseenter',()=>{ btnScaleTarget=1.14; enterBtn.style.cursor='pointer'; });
+enterBtn.addEventListener('mouseleave',()=>{ btnScaleTarget=1.0; });
+function updateEnterBtn(){
+  const bm=buttonMesh||screenMesh;
+  if(!bm||intro.playing||entering){ enterBtn.style.display='none'; crtUniforms.uBtnOn.value=0; return; }
+  const wp=bm.getWorldPosition(new THREE.Vector3());
+  const proj=wp.clone().project(camera);
+  if(proj.z>1){ enterBtn.style.display='none'; crtUniforms.uBtnOn.value=0; return; }
+  const x=(proj.x*0.5+0.5)*innerWidth;
+  const y=(-proj.y*0.5+0.5)*innerHeight;
+  // 热区尺寸按屏幕投影宽度（按钮在 shader 里占屏幕中间约 78% 宽）
+  const box=new THREE.Box3().setFromObject(bm);
+  const corners=[];
+  for(const cx of [box.min.x,box.max.x]) for(const cy of [box.min.y,box.max.y]){
+    corners.push(new THREE.Vector3(cx,cy,box.max.z).project(camera));
+  }
+  const xs=corners.map(c=>(c.x*0.5+0.5)*innerWidth);
+  const ys=corners.map(c=> (-c.y*0.5+0.5)*innerHeight);
+  const w=Math.max(...xs)-Math.min(...xs);
+  const h=Math.max(...ys)-Math.min(...ys);
+  enterBtn.style.left=x+'px';
+  enterBtn.style.top=y+'px';
+  enterBtn.style.width=(w*0.8)+'px';
+  enterBtn.style.height=(h*0.3)+'px';
+  enterBtn.style.display='block';
+  crtUniforms.uBtnOn.value=1; // shader 绘制按钮
+}
+
+// ===== 应用参数 =====
+function applyParams(){
+  renderer.toneMappingExposure=S.exposure;
+  scene.environmentIntensity=S.envIntensity;
+  keyLight.intensity=S.keyLight*0.35;
+  rimLight.intensity=S.rimLight;
+  screenLight.intensity=S.screenPoint;
+  screenSpot.intensity=S.screenSpot;
+  bloom.strength=S.bloomStrength; bloom.radius=S.bloomRadius; bloom.threshold=S.bloomThreshold;
+  crtUniforms.uCore.value=S.screenCore; crtUniforms.uScan.value=S.scanline; crtUniforms.uFlick.value=S.flicker;
+  grainPass.uniforms.uAmount.value=S.grain;
+  metalMaterials.forEach(m=>{ m.metalness=S.metalness; m.needsUpdate=true; });
+  // 新增：颜色 / 灯光角度 / 屏幕色 / 玻璃反射
+  keyLight.color.set(S.keyColor);
+  rimLight.color.set(S.rimColor);
+  keyLight.position.set(S.keyX,S.keyY,S.keyZ);
+  crtUniforms.uColor.value.set(S.crtColor);
+  if(glassMatRef){ glassMatRef.envMapIntensity=S.glassReflect; }
+  // 阴影柔和度
+  keyLight.shadow.radius=S.shadowRadius;
+  keyLight.shadow.blurSamples=S.shadowBlur;
+  keyLight.shadow.needsUpdate=true;
+  if(groundMat && groundMat.isShadowMaterial) groundMat.opacity=S.shadowOpacity;
+  if(contactShadow && contactShadow.material) contactShadow.material.opacity=Math.min(1,S.shadowOpacity*2.8);
+}
+// 背景/环境重生成较慢，单独函数（颜色、柔光箱亮度变化时调用）
+function applyEnvironment(){
+  updateBackground();
+  updateEnvironment();
+}
+applyParams();
+
+// ===== 调参面板 =====
+const DEBUG = qs.get('debug') === '1';
+const gui=new GUI({title:'调参面板'});
+if(!DEBUG) gui.hide();  // 默认隐藏调参面板，?debug=1 才显示
+const a=gui.addFolder('曝光/环境');
+a.add(S,'exposure',0.1,1.5,0.01).name('曝光').onChange(applyParams);
+a.add(S,'envIntensity',0,1,0.01).name('环境反射').onChange(applyParams);
+const b=gui.addFolder('灯光');
+b.add(S,'keyLight',0,3,0.01).name('主光').onChange(applyParams);
+b.add(S,'rimLight',0,2,0.01).name('轮廓光').onChange(applyParams);
+b.add(S,'screenPoint',0,20,0.1).name('屏幕点光').onChange(applyParams);
+b.add(S,'screenSpot',0,40,0.5).name('屏幕聚光').onChange(applyParams);
+const c=gui.addFolder('辉光');
+c.add(S,'bloomStrength',0,2,0.01).name('强度').onChange(applyParams);
+c.add(S,'bloomRadius',0,1,0.01).name('半径').onChange(applyParams);
+c.add(S,'bloomThreshold',0,2,0.01).name('阈值').onChange(applyParams);
+const d=gui.addFolder('CRT');
+d.add(S,'screenCore',0,4,0.01).name('核心亮度').onChange(applyParams);
+d.add(S,'scanline',0,3,0.01).name('扫描线').onChange(applyParams);
+d.add(S,'flicker',0,2,0.01).name('频闪').onChange(applyParams);
+const ef=gui.addFolder('质感');
+ef.add(S,'grain',0,0.3,0.005).name('颗粒').onChange(applyParams);
+ef.add(S,'metalness',0,1,0.01).name('金属度').onChange(applyParams);
+ef.add(S,'glassReflect',0,5,0.01).name('玻璃反射').onChange(applyParams);
+// ===== 颜色 =====
+const col=gui.addFolder('颜色');
+col.addColor(S,'bgTop').name('背景上').onChange(applyEnvironment);
+col.addColor(S,'bgBottom').name('背景下').onChange(applyEnvironment);
+col.addColor(S,'keyColor').name('主光色').onChange(applyParams);
+col.addColor(S,'rimColor').name('轮廓光色').onChange(applyParams);
+col.addColor(S,'crtColor').name('CRT屏幕色').onChange(applyParams);
+// ===== 灯光角度 =====
+const la=gui.addFolder('灯光角度');
+la.add(S,'keyX',-15,15,0.1).name('主光 X').onChange(applyParams);
+la.add(S,'keyY',0,20,0.1).name('主光 Y').onChange(applyParams);
+la.add(S,'keyZ',-15,15,0.1).name('主光 Z').onChange(applyParams);
+la.add(S,'softboxInt',0,60,0.5).name('柔光箱亮度').onChange(applyEnvironment);
+// ===== 阴影 =====
+const sh=gui.addFolder('阴影柔和度');
+sh.add(S,'shadowRadius',0,40,0.5).name('模糊半径').onChange(applyParams);
+sh.add(S,'shadowBlur',4,64,1).name('模糊采样').onChange(applyParams);
+sh.add(S,'shadowOpacity',0,1,0.01).name('阴影深度').onChange(applyParams);
+const g=gui.addFolder('相机');
+g.add(S,'camX',-2,2,0.01).name('水平 X').onChange(updateCamera);
+g.add(S,'camY',-0.5,1.5,0.01).name('高度 Y').onChange(updateCamera);
+g.add(S,'camZ',-2,2,0.01).name('前后 Z').onChange(updateCamera);
+g.add(S,'targetY',-0.8,0.8,0.01).name('画面垂直').onChange(updateCamera);
+const acts={
+  '重播入场':()=>{ if(modelCenter) startIntro(); },
+  '导出参数链接':()=>{
+    const q=new URLSearchParams();
+    Object.entries(S).forEach(([k,v])=>{
+      q.set(k, typeof v==='number' ? String(+v.toFixed(4)) : v);
+    });
+    const url=location.origin+location.pathname+'?'+q.toString();
+    document.getElementById('exportUrl').value=url;
+    document.getElementById('exportBox').style.display='block';
+  },
+  '重置默认':()=>location.reload()
+};
+gui.add(acts,'重播入场'); gui.add(acts,'导出参数链接'); gui.add(acts,'重置默认');
+document.getElementById('closeExport').onclick=()=>document.getElementById('exportBox').style.display='none';
+document.getElementById('copyBtn').onclick=()=>{
+  const ta=document.getElementById('exportUrl'); ta.select();
+  navigator.clipboard.writeText(ta.value);
+  document.getElementById('copyBtn').textContent='已复制✓';
+};
+
+// ===== 渲染循环 =====
+const clock=new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);
+  if(document.hidden) return; // 页面在后台时跳过渲染，避免持续吃 CPU/GPU
+  const dt=Math.min(clock.getDelta(),0.05);
+  const t=clock.getElapsedTime();
+  crtUniforms.uTime.value=t;
+  grainPass.uniforms.uTime.value=t;
+  // hover 按钮缩放平滑过渡
+  crtUniforms.uBtnScale.value += (btnScaleTarget-crtUniforms.uBtnScale.value)*Math.min(1,dt*12);
+  if(intro.playing) updateIntro(dt);
+  else if(drift.active) updateDrift(dt);
+  else if(recentering.active && homeSpherical && !entering){
+    // 缓慢回正：把方位角朝初始位置平滑插值（保持距离和俯角不变）
+    const s=new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+    const diff=normAngle(homeSpherical.theta-s.theta);
+    s.theta+=diff*Math.min(1,dt*2.2); // 缓慢
+    s.phi=homeSpherical.phi;
+    s.radius=homeSpherical.radius;
+    camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(s));
+    camera.lookAt(controls.target);
+    if(Math.abs(diff)<0.005){ recentering.active=false; controls.update(); }
+  }
+  else if(!entering && viewMode==='home') controls.update();
+  if(viewMode==='home') updateEnterBtn();
+  else { enterBtn.style.display='none'; crtUniforms.uBtnOn.value=0; }
+  composer.render();
+}
+loop();
+window.addEventListener('resize',()=>{
+  renderer.setSize(innerWidth,innerHeight);
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  composer.setSize(innerWidth,innerHeight);
+  if(viewMode==='portfolio') fitPortfolioToScreen();
+});
+
+// ===== Lanyard 完整版（react-bits Lanyard 原生移植，含 FOIL shader + Verlet 物理）=====
+let lanyard=null;
+function startLanyard(){
+  if(lanyard) return;
+  const holder=document.getElementById('aboutLeft');
+  // 纯黑 data URL：组件背面逻辑是 images.back||images.front，必须给背面显式黑图
+  const bc=document.createElement('canvas'); bc.width=bc.height=8;
+  const bx=bc.getContext('2d'); bx.fillStyle='#000000'; bx.fillRect(0,0,8,8);
+  const blackUrl=bc.toDataURL('image/png');
+  lanyard=new Lanyard(holder,{
+    frontImage:'card-front.png',   // 正面：名片照片
+    backImage:blackUrl,            // 背面：纯黑
+    strapImage:undefined,          // 带子：纯黑（组件内置织纹）
+    cardColor:'#f2f1ee',           // 卡片底色浅色：边缘呈真实白卡边（背面由 blackUrl 单独控制纯黑）
+    strapColor:'#0a0a0a',          // 带子纯黑
+    imageFit:'cover',
+    orientation:'portrait',
+    finish:'glossy',
+    cornerRadius:0.3,
+    size:0.48,
+    anchor:'center',
+    strapLength:0.5,
+    metal:'silver',
+    gravity:1, damping:0.7, elasticity:0.5, breeze:0,
+    interactive:true, intro:true
+  });
+}
+function stopLanyard(){
+  if(!lanyard) return;
+  lanyard.destroy();
+  lanyard=null;
+}
+
+</script>
+</body>
 </html>
