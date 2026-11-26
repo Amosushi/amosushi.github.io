@@ -332,6 +332,23 @@
   .personal-title { font-size:15px; font-weight:600; letter-spacing:2px; }
   .personal-clock { justify-self:end; font-size:13px; letter-spacing:1px; opacity:.85; }
   /* 子页网格完全继承 .mac-icons，与首页保持一致的划分 */
+  /* ===== 全黑加载遮罩：3D 模型/大图加载完成前遮挡 ===== */
+  #loading-screen {
+    position:fixed; inset:0; z-index:9999; background:#000;
+    display:flex; align-items:center; justify-content:center;
+    transition:opacity .6s ease;
+  }
+  #loading-screen.fade-out { opacity:0; pointer-events:none; }
+  .loading-box {
+    border:1px solid rgba(255,255,255,.18); padding:26px 44px; text-align:center;
+  }
+  .loading-text {
+    font-family:'FLYNN Mono',var(--mono); font-size:clamp(20px,2.4vw,30px);
+    color:#fff; letter-spacing:4px; display:flex; align-items:baseline; justify-content:center;
+  }
+  #loading-percent { min-width:4ch; text-align:right; }
+  .loading-cursor { color:#00ffbf; animation:cursorBlink .75s step-end infinite; }
+  @keyframes cursorBlink { 50% { opacity:0; } }
 </style>
 <script type="importmap">
 { "imports": {
@@ -342,6 +359,12 @@
 </script>
 </head>
 <body>
+<!-- 全黑加载遮罩 -->
+<div id="loading-screen">
+  <div class="loading-box">
+    <div class="loading-text">LOADING<span id="loading-percent">0</span><span class="loading-cursor">%</span></div>
+  </div>
+</div>
 <nav class="navbar">
   <a href="#" class="nav-logo" id="logoLink"><img src="Logo.webp" alt="Logo" class="logo-img"></a>
   <ul class="nav-links">
@@ -1449,7 +1472,23 @@ loader.load(modelFile, (gltf)=>{
   if(qs.get('intro')!=='0') startIntro();
   window.__camera=camera; window.__controls=controls; window.__intro=intro; window.__drift=drift; window.__root=root; window.__THREE=THREE;
   window.__ready=true;
-}, undefined, (err)=>{ document.getElementById('err').textContent='LOAD ERROR: '+err.message; });
+  // 预加载 Resume 名片照片，避免打开弹层时才加载卡顿
+  const preload=new Image(); preload.src='card-front.png';
+  // 模型就绪 → 淡出加载遮罩（短暂延时让首帧先渲染）
+  const ls=document.getElementById('loading-screen');
+  if(ls){ setTimeout(()=>ls.classList.add('fade-out'),120); }
+}, (ev)=>{
+  // 下载进度
+  if(ev && ev.total){
+    const pct=Math.min(99,Math.round(ev.loaded/ev.total*100));
+    const el=document.getElementById('loading-percent');
+    if(el) el.textContent=String(pct);
+  }
+}, (err)=>{
+  document.getElementById('err').textContent='LOAD ERROR: '+err.message;
+  const ls=document.getElementById('loading-screen');
+  if(ls) ls.classList.add('fade-out');
+});
 
 // ===== 更新 Enter 按钮位置（屏幕中心投影到 2D）=====
 const enterBtn=document.getElementById('enterBtn');
