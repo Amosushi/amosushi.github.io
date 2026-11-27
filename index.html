@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Jiho's Lab</title>
 <link rel="icon" href="favicon.png" type="image/png">
+<script>
+/* 移动端：跳到轻量版（无 3D）。加 ?desktop=1 可强制看桌面版 */
+(function(){
+  var coarse=window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+  var narrow=window.innerWidth<768;
+  if((coarse||narrow) && !/[?&]desktop=1/.test(location.search)){
+    location.replace('mobile.html'+location.search);
+  }
+})();
+</script>
 <style>
   * { box-sizing: border-box; }
   /* Chakra UI mono 字体栈（截图里 DevTools 的 --chakra-fonts-mono） */

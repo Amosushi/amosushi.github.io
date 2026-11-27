@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Jiho · 作品</title>
+<link rel="icon" href="favicon.png" type="image/png">
+<style>
+  :root{
+    --mono: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    --a2:#f0f0ee; --a2-dim:rgba(240,240,238,.5);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;width:100%;height:100%;
+    /* 与桌面端 Apple II 一致的暖灰渐变背景 */
+    background:linear-gradient(180deg,#A49F8F 0%,#a9a391 50%,#ada794 100%);
+    color:#fff;font-family:var(--mono);overflow-x:hidden;}
+  body{overscroll-behavior:none;}
+
+  /* CRT 细纹：仅进入屏幕（作品页/个人页）后显示，首页是真实空间不要底纹 */
+  .scanlines{position:fixed;inset:0;z-index:90;pointer-events:none;opacity:0;transition:opacity .3s;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0px,rgba(0,0,0,.18) 1px,transparent 1px,transparent 3px);}
+  .scanlines.on{opacity:1;}
+
+  /* ===== 顶部导航：Logo + Tab ===== */
+  .navbar{position:fixed;top:0;left:0;width:100%;z-index:100;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;background:rgba(0,0,0,.55);
+    border-bottom:1px solid rgba(240,240,238,.3);transition:background .3s;}
+  .nav-logo img{height:18px;width:auto;object-fit:contain;filter:brightness(0) invert(1);}
+  .nav-links{display:flex;gap:10px;list-style:none;margin:0;padding:0;}
+  .nav-links a{font-family:var(--mono);font-size:15px;letter-spacing:1px;color:#fff;text-decoration:none;
+    position:relative;padding:8px 12px;min-height:44px;display:flex;align-items:center;}
+  .nav-links a::after{content:'';position:absolute;bottom:2px;left:12px;right:12px;height:1px;background:#fff;transform:scaleX(0);transition:transform .3s;}
+  .nav-links a.active::after{transform:scaleX(1);}
+  /* 首页：透明底、白字、无分割线 */
+  .navbar.home-nav{background:transparent;border-bottom:none;}
+  .navbar.home-nav .nav-logo img{filter:brightness(0) invert(1);}
+  .navbar.home-nav .nav-links a{color:#fff;}
+  .navbar.home-nav .nav-links a::after{background:#fff;}
+  /* Resume（浅色页）：顶栏透明、文字黑色 */
+  .navbar.light{background:#f5f3ee;border-bottom-color:rgba(0,0,0,.12);} /* 实底：滚动时文字不透上来 */
+  .navbar.light .nav-logo img{filter:brightness(0);} /* 浅底上 Logo 变黑 */
+  .navbar.light .nav-links a{color:#1a1815;}
+  .navbar.light .nav-links a::after{background:#1a1815;}
+
+  /* ===== 首页：电脑图 + 那句话 ===== */
+  .home{min-height:100dvh;display:flex;flex-direction:column;align-items:center;
+    padding:88px 22px 32px;text-align:center;}
+  .hero-img{width:min(80vw,380px);height:auto;display:block;cursor:pointer;
+    margin:22px 0; /* 上下留白 */
+    animation:heroIn .9s cubic-bezier(.2,.7,.2,1) both;} /* 渐现+上浮 */
+  @keyframes heroIn{ from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:none} }
+  .hero-text{font-size:clamp(12px,3.4vw,15px);line-height:1.9;color:#fff;letter-spacing:.5px;
+    margin:26px 0 30px;}
+  .hero-line{display:block;animation:lineIn .6s ease both;}
+  .hero-line:nth-child(1){animation-delay:.35s;}
+  .hero-line:nth-child(2){animation-delay:.55s;}
+  .hero-line:nth-child(3){animation-delay:.75s;}
+  .hero-line:nth-child(4){animation-delay:.95s;}
+  .hero-line:nth-child(5){animation-delay:1.15s;}
+  @keyframes lineIn{ from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+  .hero-text .sc-first{font-size:clamp(16px,4.6vw,20px);margin-bottom:6px;}
+  .hero-text .sc-dim{color:rgba(255,255,255,.85);}
+  .enter-btn{display:inline-block;padding:14px 54px;border:1px solid rgba(255,255,255,.9);border-radius:999px;
+    background:transparent;color:#fff;font-family:var(--mono);font-size:16px;letter-spacing:3px;
+    cursor:pointer;}
+  .enter-btn:active{background:rgba(255,255,255,.15);}
+  .home-note{width:100%;text-align:center;margin-top:auto;padding-top:40px;
+    font-size:12px;letter-spacing:.5px;color:rgba(255,255,255,.75);}
+
+  /* ===== 作品页 ===== */
+  .view{position:fixed;inset:0;z-index:60;
+    /* 直接用桌面屏幕截图做底：黑底 + 反光 + 底纹 */
+    background:#000 url('screen-bg.webp') center/cover no-repeat;
+    padding:96px 16px 30px;overflow-y:auto;display:none;}
+  .view.show{display:block;}
+  /* 2 列图标网格 */
+  .icons{display:grid;grid-template-columns:repeat(2,1fr);gap:22px 12px;}
+  .icon{display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none;color:var(--a2);cursor:pointer;
+    animation:iconIn .55s cubic-bezier(.2,.7,.2,1) both;}
+  @keyframes iconIn{ from{opacity:0;transform:translateY(16px) scale(.94)} to{opacity:1;transform:none} }
+  /* 作品页/个人页图标逐个出现 */
+  .icons .icon:nth-child(1){animation-delay:.05s;}
+  .icons .icon:nth-child(2){animation-delay:.13s;}
+  .icons .icon:nth-child(3){animation-delay:.21s;}
+  .icons .icon:nth-child(4){animation-delay:.29s;}
+  .icons .icon:nth-child(5){animation-delay:.37s;}
+  .icons .icon:nth-child(6){animation-delay:.45s;}
+  .ico{width:clamp(56px,17vw,80px);height:clamp(56px,17vw,80px);display:flex;align-items:center;justify-content:center;}
+  .ico img{width:100%;height:100%;object-fit:contain;}
+  .label{font-size:12px;line-height:1.35;text-align:center;text-shadow:0 1px 3px rgba(0,0,0,.9);}
+  .sub{font-size:10px;opacity:.72;}
+
+  /* 个人项目子页（返回 + 标题 + 时间） */
+  .personal{position:fixed;inset:0;z-index:70;
+    background:#000 url('screen-bg.webp') center/cover no-repeat;
+    display:none;flex-direction:column;padding-top:0;}
+  .personal.show{display:flex;}
+  /* 个人页导航栏取代顶部栏：高度/样式与主 navbar 一致 */
+  .personal-bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+    flex-shrink:0;
+    padding:12px 16px;height:69px;background:rgba(0,0,0,.55);
+    border-bottom:1px solid rgba(240,240,238,.3);}
+  .back{display:flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-size:12px;letter-spacing:1px;}
+  .back svg{width:16px;height:16px;}
+  .bar-title{font-size:16px;font-weight:600;letter-spacing:2px;}
+  .clock{justify-self:end;font-size:13px;opacity:.85;}
+  .personal .icons{padding:22px 16px;}
+
+  /* ===== Resume：静态名片 + 简历 ===== */
+  .about{position:fixed;inset:0;z-index:80;background:#f5f3ee;display:none;overflow-y:auto;}
+  .about.show{display:block;}
+  .about-close{position:fixed;top:60px;right:16px;z-index:2;width:34px;height:34px;border:1px solid rgba(0,0,0,.3);
+    background:rgba(255,255,255,.7);color:#222;font-size:22px;line-height:1;border-radius:50%;cursor:pointer;}
+  .about-inner{max-width:520px;margin:0 auto;padding:104px 26px 40px;color:#1a1815;}
+  .card{width:min(40vw,160px);margin:0 auto 30px;border-radius:10px;overflow:hidden;
+    box-shadow:0 12px 30px rgba(0,0,0,.22);background:#fff;}
+  .card img{width:100%;height:auto;display:block;}
+  .about-name{font-size:24px;margin:0 0 22px;letter-spacing:1px;}
+  .tags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:40px;}
+  .tags span{font-size:12px;padding:5px 10px;border:1px solid rgba(0,0,0,.2);border-radius:20px;}
+  .tl-item{margin-bottom:42px;padding-left:16px;border-left:2px solid rgba(0,0,0,.15);}
+  .tl-item:last-child{margin-bottom:0;}
+  .tl-head{display:flex;flex-direction:column;gap:8px;}
+  .tl-date{font-size:12px;color:#999;font-weight:400;letter-spacing:.5px;} /* 年份弱化 */
+  .tl-line{font-size:16px;font-weight:700;color:#1a1815;line-height:1.35;} /* 公司+Title 大粗黑 */
+  .tl-org{color:#1a1815;}
+  .tl-role{color:#1a1815;font-weight:400;font-size:14px;}
+  .tl-item p{font-size:12px;line-height:1.85;margin:12px 0 0;color:#444;}
+  .contact{margin-top:44px;padding-top:28px;border-top:1px solid rgba(0,0,0,.12);}
+  .contact-btn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
+    margin-bottom:12px;padding:12px 16px;border:1px solid rgba(0,0,0,.2);border-radius:999px;
+    background:transparent;color:#1a1815;font-family:var(--mono);font-size:13px;cursor:pointer;}
+  .contact-btn:active{background:rgba(0,0,0,.06);}
+  .cb-left{display:flex;align-items:center;gap:9px;min-width:0;}
+  .cb-left .contact-icon{width:18px;height:18px;flex-shrink:0;}
+  .contact-btn .copy{display:flex;align-items:center;gap:5px;flex-shrink:0;
+    font-size:12px;border:1px solid rgba(0,0,0,.25);border-radius:999px;padding:5px 12px;}
+  .contact-btn .copy svg{width:13px;height:13px;}
+  #toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:200;
+    background:rgba(26,24,21,.92);color:#fff;padding:10px 20px;border-radius:999px;font-size:13px;
+    opacity:0;pointer-events:none;transition:opacity .25s;}
+  #toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+
+<nav class="navbar">
+  <a href="#" class="nav-logo" id="logo"><img src="Logo.webp" alt="Logo"></a>
+  <ul class="nav-links">
+    <li><a id="tabPortfolio" class="active">Portfolio</a></li>
+    <li><a id="tabResume">Resume</a></li>
+  </ul>
+</nav>
+
+<!-- 首页 -->
+<main class="home" id="home">
+  <img class="hero-img" id="heroImg" src="appleii-mobile.webp" alt="Apple II">
+  <div class="hero-text">
+    <span class="hero-line sc-first">Hi, I’m Jiho Kim</span>
+    <span class="hero-line sc-dim">11 Years Design Experience</span>
+    <span class="hero-line sc-dim">Full-stack VibeCoding</span>
+    <span class="hero-line sc-dim">Team Management</span>
+    <span class="hero-line sc-dim">Independent Business Ownership</span>
+  </div>
+  <button class="enter-btn" id="enterBtn">Enter</button>
+  <div class="home-note">移动端为简易版，完整版体验请使用电脑端打开</div>
+</main>
+
+<!-- 作品页 -->
+<section class="view" id="worksView">
+  <div class="icons">
+    <a class="icon" href="#"><span class="ico"><img src="qts-icon.png" alt=""></span><span class="label">青团社<br><span class="sub">2019-至今</span></span></a>
+    <a class="icon" href="#"><span class="ico"><img src="dingtalk-icon.png" alt=""></span><span class="label">钉钉<br><span class="sub">2017-2019</span></span></a>
+    <a class="icon" href="#"><span class="ico"><img src="必连.png" alt=""></span><span class="label">必连<br><span class="sub">2015-2017</span></span></a>
+    <a class="icon" href="#"><span class="ico"><img src="设计管理.png" alt=""></span><span class="label">设计管理<br><span class="sub">效率与质量</span></span></a>
+    <a class="icon" href="#"><span class="ico"><img src="GEO项目.png" alt=""></span><span class="label">GEO项目<br><span class="sub">2026-至今</span></span></a>
+    <a class="icon" id="personalIcon" href="#"><span class="ico"><img src="个人项目.png" alt=""></span><span class="label">个人项目<br><span class="sub">AI与商务合作</span></span></a>
+  </div>
+</section>
+
+<!-- 个人项目子页 -->
+<section class="personal" id="personal">
+  <div class="personal-bar">
+    <a class="back" id="back" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg><span>返回</span></a>
+    <div class="bar-title">个人项目</div>
+    <div class="clock" id="clock"></div>
+  </div>
+  <div class="icons">
+    <a class="icon" href="https://jiho.work/cutiepet/index.html" target="_blank" rel="noopener"><span class="ico"><img src="cutiepet.webp" alt=""></span><span class="label">Cutie Pet<br><span class="sub">电子宠物游戏</span></span></a>
+    <a class="icon" href="https://jiho.work/karinarun/index.html" target="_blank" rel="noopener"><span class="ico"><img src="karinarun.webp" alt=""></span><span class="label">Karina Run<br><span class="sub">柳智敏同人跑酷</span></span></a>
+    <a class="icon" href="https://jiho.work/magichand/index.html" target="_blank" rel="noopener"><span class="ico"><img src="magichand.webp" alt=""></span><span class="label">Magic Hand<br><span class="sub">摄像头实时特效</span></span></a>
+    <a class="icon" href="https://jiho.work/fpsbuddy/index.html" target="_blank" rel="noopener"><span class="ico"><img src="fpsbuddy.webp" alt=""></span><span class="label">FPS Buddy<br><span class="sub">练枪小工具</span></span></a>
+  </div>
+</section>
+
+<!-- Resume -->
+<section class="about" id="about">
+  <div class="about-inner">
+    <h1 class="about-name">JihoKim</h1>
+    <div class="tags"><span>11年设计经验</span><span>团队效率提升</span><span>VibeCoding</span><span>业务经验</span><span>Base 杭州</span></div>
+    <div class="tl-item">
+      <div class="tl-head"><span class="tl-date">2019～至今</span><span class="tl-line"><span class="tl-org">灵卡科技</span> · <span class="tl-role">用户体验总监</span></span></div>
+      <p>支付宝投资企业，中国最大灵活用工招聘平台，C轮融资。</p>
+      <p>负责青团社平台BC端全链路体验、设计团队管理、健康度业务、GEO业务及品牌视觉设计。</p>
+      <p>不断打磨产品体验，为求职者和商家无限提升撮合效率，以实现平台长期业务价值。</p>
+    </div>
+    <div class="tl-item">
+      <div class="tl-head"><span class="tl-date">2017～2019</span><span class="tl-line"><span class="tl-org">阿里巴巴·钉钉</span> · <span class="tl-role">资深体验设计师</span></span></div>
+      <p>阿里巴巴旗下智能移动办公平台，中国最大企业级SaaS。</p>
+      <p>负责并参与Smart Work业务线多个项目，如审批、智能人事、钉钉新校招等，深入 B端企业用户的实际场景中，为其提供高效增能的产品体验。</p>
+    </div>
+    <div class="tl-item">
+      <div class="tl-head"><span class="tl-date">2015～2017</span><span class="tl-line"><span class="tl-org">必连Blink</span> · <span class="tl-role">设计主管</span></span></div>
+      <p>公司由创新工场、红杉中国领投，过亿美元估值，专注于C端社交领域。</p>
+      <p>负责各项目主设计、设计团队管理工作，在职期间参与快看Blink、美播直播、GeGe、鬼畜输入法等多个爆款项目，为C端用户创造惊喜和趣味十足的创新设计。</p>
+    </div>
+    <div class="contact">
+      <button class="contact-btn" data-copy="AmosKim">
+        <span class="cb-left"><svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>AmosKim</span>
+        <span class="copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>复制</span>
+      </button>
+      <button class="contact-btn" data-copy="amoskim@outlook.com">
+        <span class="cb-left"><svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>amoskim@outlook.com</span>
+        <span class="copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>复制</span>
+      </button>
+      <div style="margin-top:20px;font-size:12px;opacity:.6;">移动端为简易版，完整版体验请使用电脑端打开</div>
+    </div>
+  </div>
+</section>
+<div id="toast"></div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const home=$('home'), works=$('worksView'), personal=$('personal'), about=$('about');
+  const tabP=$('tabPortfolio'), tabR=$('tabResume'), navbar=document.querySelector('.navbar');
+  const scanlines=document.querySelector('.scanlines');
+  const setScan=on=>scanlines.classList.toggle('on',on);
+  const showNav=on=>navbar.style.display=on?'flex':'none';
+
+  function showView(v){
+    home.style.display = (v==='home')?'flex':'none';
+    works.classList.toggle('show', v==='works');
+    personal.classList.remove('show');
+    about.classList.remove('show');
+    // 首页不选中任何 Tab；作品页选中 Portfolio
+    tabP.classList.toggle('active', v==='works');
+    tabR.classList.remove('active');
+    navbar.classList.remove('light');
+    navbar.classList.toggle('home-nav', v==='home'); // 首页透明底白字无分割线
+    setScan(v!=='home'); // 首页真实空间无底纹，进入屏幕才有
+    showNav(true);
+    window.scrollTo(0,0);
+  }
+  let aboutFrom='home';
+  function showAbout(){
+    aboutFrom = works.classList.contains('show') ? 'works' : 'home';
+    personal.classList.remove('show');
+    about.classList.add('show');
+    tabR.classList.add('active'); tabP.classList.remove('active');
+    navbar.classList.remove('home-nav');
+    navbar.classList.add('light'); // 浅色页：顶栏透明黑字
+    setScan(false); // Resume 浅色页不要 CRT 底纹
+    showNav(true);
+  }
+  function closeAbout(){
+    about.classList.remove('show'); tabR.classList.remove('active'); navbar.classList.remove('light');
+    navbar.classList.toggle('home-nav', aboutFrom==='home');
+    tabP.classList.toggle('active', aboutFrom==='works');
+    setScan(aboutFrom==='works');
+  }
+
+  $('heroImg').addEventListener('click', ()=>showView('works'));
+  $('enterBtn').addEventListener('click', ()=>showView('works'));
+  tabP.addEventListener('click', ()=>showView('works'));
+  tabR.addEventListener('click', showAbout);
+  $('logo').addEventListener('click', e=>{ e.preventDefault(); closeAbout(); personal.classList.remove('show'); showView('home'); });
+
+  $('personalIcon').addEventListener('click', e=>{
+    e.preventDefault(); tick();
+    works.classList.remove('show'); personal.classList.add('show');
+    showNav(false);   // 个人页用自己的导航栏取代顶部栏
+    setScan(true);
+  });
+  $('back').addEventListener('click', e=>{
+    e.preventDefault(); personal.classList.remove('show'); works.classList.add('show');
+    showNav(true);
+  });
+
+  function tick(){
+    const d=new Date(); let h=d.getHours(), m=String(d.getMinutes()).padStart(2,'0');
+    const ap=h>=12?'PM':'AM'; h=h%12||12;
+    $('clock').textContent=`${h}:${m} ${ap}`;
+  }
+  tick(); setInterval(tick,30000);
+
+  // 微信/邮箱复制
+  const toast=$('toast'); let toastTimer=null;
+  function showToast(msg){
+    toast.textContent=msg; toast.classList.add('show');
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove('show'),1800);
+  }
+  document.querySelectorAll('.contact-btn[data-copy]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const text=btn.getAttribute('data-copy');
+      try{
+        if(navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+        else { const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+        showToast(text.includes('@')?'已复制邮箱地址':'已复制微信号');
+      }catch(e){ showToast('复制失败，请长按选择'); }
+    });
+  });
+
+  showView('home'); // 初始：首页不选中任何 Tab
+})();
+</script>
+</body>
+</html>
