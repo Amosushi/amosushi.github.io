@@ -329,7 +329,11 @@
   /* 子页网格完全继承 .mac-icons，与首页保持一致的划分 */
   /* ===== 全黑加载遮罩：3D 模型/大图加载完成前遮挡 ===== */
   #loading-screen {
-    position:fixed; inset:0; z-index:9999; background:#000;
+    position:fixed; inset:0; z-index:9999;
+    /* 黑底 + 细密扫描线纹理，与作品页 CRT 风格一致 */
+    background:
+      repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0px,rgba(255,255,255,.035) 1px,transparent 1px,transparent 3px),
+      #000;
     display:flex; align-items:center; justify-content:center;
     transition:opacity .6s ease;
   }
@@ -342,7 +346,7 @@
     color:#fff; letter-spacing:4px; display:flex; align-items:baseline; justify-content:center;
   }
   #loading-percent { min-width:4ch; text-align:right; }
-  .loading-cursor { color:#00ffbf; animation:cursorBlink .75s step-end infinite; }
+  .loading-cursor { color:#ffffff; animation:cursorBlink .75s step-end infinite; }
   @keyframes cursorBlink { 50% { opacity:0; } }
 </style>
 <script type="importmap">
