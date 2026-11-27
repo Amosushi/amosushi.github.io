@@ -484,6 +484,7 @@
           <div class="personal-clock" id="personalClock">9:41 AM</div>
         </div>
         <div class="mac-icons personal-icons">
+          <a class="mac-icon" href="works/argentina-embassy/index.html" target="_blank" rel="noopener noreferrer"><span class="mac-ico"><img src="football.webp" alt="世界杯活动"></span><span class="mac-label">世界杯活动<br><span class="mac-sub">大使馆线下合作</span></span></a>
           <a class="mac-icon" href="https://jiho.work/cutiepet/index.html" target="_blank" rel="noopener noreferrer"><span class="mac-ico"><img src="cutiepet.webp" alt="Cutie Pet"></span><span class="mac-label">Cutie Pet<br><span class="mac-sub">电子宠物游戏</span></span></a>
           <a class="mac-icon" href="https://jiho.work/karinarun/index.html" target="_blank" rel="noopener noreferrer"><span class="mac-ico"><img src="karinarun.webp" alt="Karina Run"></span><span class="mac-label">Karina Run<br><span class="mac-sub">柳智敏同人跑酷</span></span></a>
           <a class="mac-icon" href="https://jiho.work/magichand/index.html" target="_blank" rel="noopener noreferrer"><span class="mac-ico"><img src="magichand.webp" alt="Magic Hand"></span><span class="mac-label">Magic Hand<br><span class="mac-sub">摄像头实时特效</span></span></a>
@@ -984,7 +985,7 @@ function updateCamera(){
 }
 
 // ===== 入场动画：近处旋转落位 + 曝光渐亮 =====
-const intro={ playing:false, t:0, dur:2.6,
+const intro={ playing:false, pending:false, t:0, dur:2.6,
   startPos:new THREE.Vector3(), startTarget:new THREE.Vector3(),
   endPos:new THREE.Vector3(), endTarget:new THREE.Vector3(), finalExposure:0.64 };
 // autoPlay=false：只把相机摆到入场起点（画面停在近处、曝光0），不开始计时
@@ -1001,6 +1002,7 @@ function startIntro(autoPlay){
   intro.startPos.copy(modelCenter).add(startR);
   intro.startTarget.copy(target);
   intro.t=0; intro.playing=autoPlay;
+  intro.pending=!autoPlay; // 摆好起点、等待遮罩淡出后才播放（此期间禁止 controls.update 把相机拉回终点）
   controls.enabled=false;
   camera.position.copy(intro.startPos);
   camera.lookAt(intro.startTarget);
@@ -1495,9 +1497,9 @@ loader.load(modelFile, (gltf)=>{
     if(ls){
       setTimeout(()=>{
         ls.classList.add('fade-out');
-        if(!skipIntro) setTimeout(()=>{ intro.playing=true; }, 650); // 等 0.6s 淡出完成
+        if(!skipIntro) setTimeout(()=>{ intro.pending=false; intro.playing=true; }, 650); // 等 0.6s 淡出完成
       },120);
-    } else if(!skipIntro){ intro.playing=true; }
+    } else if(!skipIntro){ intro.pending=false; intro.playing=true; }
   };
   preload.onload=finishLoading;
   preload.onerror=finishLoading;
@@ -1673,7 +1675,7 @@ function loop(){
     camera.lookAt(controls.target);
     if(Math.abs(diff)<0.005){ recentering.active=false; controls.update(); }
   }
-  else if(!entering && viewMode==='home') controls.update();
+  else if(!entering && viewMode==='home' && !intro.pending && !intro.playing) controls.update();
   if(viewMode==='home') updateEnterBtn();
   else { enterBtn.style.display='none'; crtUniforms.uBtnOn.value=0; }
   composer.render();
