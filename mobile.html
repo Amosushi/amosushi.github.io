@@ -315,7 +315,16 @@
     });
   });
 
-  showView('home'); // 初始：首页不选中任何 Tab
+  // 从图集页返回：直接恢复「作品页→个人项目」层级
+  if(new URLSearchParams(location.search).get('view')==='personal'){
+    showView('works');
+    works.classList.remove('show');
+    personal.classList.add('show');
+    showNav(false);
+    tabP.classList.add('active');
+  } else {
+    showView('home'); // 初始：首页不选中任何 Tab
+  }
 })();
 </script>
 </body>

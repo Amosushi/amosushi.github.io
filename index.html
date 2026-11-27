@@ -1209,6 +1209,24 @@ document.getElementById('personalBack').addEventListener('click', e=>{
   macDesktop.classList.remove('personal-open');
   clearInterval(personalClockTimer);
 });
+// 从图集页返回时：直接恢复「作品页→个人项目」层级（跳过相机推进动画）
+function restorePersonalView(){
+  if(!window.__ready) return;
+  intro.playing=false; intro.pending=false; drift.active=false; recentering.active=false;
+  const {pos,target}=getPortfolioCamera();
+  camera.position.copy(pos); camera.lookAt(target);
+  controls.target.copy(target); controls.enabled=true; controls.update();
+  viewMode='portfolio';
+  portfolioView.classList.add('active');
+  fitPortfolioToScreen();
+  portfolioView.classList.add('show');
+  document.getElementById('scrambleArea').style.opacity='0';
+  document.body.classList.add('portfolio-mode');
+  personalView.classList.add('open');
+  macDesktop.classList.add('personal-open');
+  updateMacClock();
+  personalClockTimer=setInterval(updateMacClock,30000);
+}
 // 点击 3D 屏幕也进入（仅首页）
 const raycaster=new THREE.Raycaster();
 const mouse=new THREE.Vector2();
@@ -1482,7 +1500,7 @@ loader.load(modelFile, (gltf)=>{
     const tgt=wp.clone().add(frontDir.clone().multiplyScalar(4)); tgt.y-=2.2;
     screenSpot.target.position.copy(tgt);
   }
-  const skipIntro=qs.get('intro')==='0';
+  const skipIntro=qs.get('intro')==='0' || qs.get('view')==='personal';
   // 预加载 Resume 名片照片（等它就绪再进入，避免弹层卡顿）
   const preload=new Image();
   let preloadDone=false;
@@ -1500,6 +1518,8 @@ loader.load(modelFile, (gltf)=>{
         if(!skipIntro) setTimeout(()=>{ intro.pending=false; intro.playing=true; }, 650); // 等 0.6s 淡出完成
       },120);
     } else if(!skipIntro){ intro.pending=false; intro.playing=true; }
+    // 从图集页返回：直接展开作品页的个人项目视图
+    if(qs.get('view')==='personal') restorePersonalView();
   };
   preload.onload=finishLoading;
   preload.onerror=finishLoading;

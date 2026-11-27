@@ -107,10 +107,11 @@
 
 <script>
 (function(){
-  // 返回：优先浏览器历史，无历史则回首页
+  // 返回：回到来源页的个人项目视图（保持层级）
   document.getElementById('back').addEventListener('click',e=>{
     e.preventDefault();
-    if(history.length>1) history.back(); else location.href='../../index.html';
+    const fromMobile=/mobile\.html/.test(document.referrer);
+    location.href=(fromMobile?'../../mobile.html':'../../index.html')+'?view=personal';
   });
 
   // 时钟
